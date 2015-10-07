@@ -1,0 +1,3 @@
+[submodule "src/p2os"]
+	path = src/p2os
+	url = https://github.com/allenh1/p2os

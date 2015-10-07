@@ -1,0 +1,15 @@
+1. First time setup:
+
+echo "source /opt/ros/indigo/setup.bash" >> ~/.bashrc
+source ~/.bashrc
+
+cd <repo>
+catkin_make
+echo "source $(pwd)/devel/setup.bash" >> ~/.bashrc
+source ~/.bashrc
+
+2. To Launch 
+cd <repo>/src
+roslaunch robot_and_map.launch
+
+
