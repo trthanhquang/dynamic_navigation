@@ -23,8 +23,9 @@ if __name__ == '__main__':
     curPose = Pose()
     curPose.position.x = 2
     curPose.position.y = 2
-    curPose.orientation = Quaternion(*quaternion_from_euler(0,0,math.pi/4)) #radian
 
+    curPose.orientation = Quaternion(*quaternion_from_euler(0,0,math.pi/4))
+    
     r = rospy.Rate(50)
     while not rospy.is_shutdown():
         set_robot_pose(curPose)
