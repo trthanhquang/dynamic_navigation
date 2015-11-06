@@ -1,8 +1,0 @@
-<launch>
-    <include file="$(find p2os_urdf)/launch/pioneer3at_urdf.launch"/>
-    <node name="map_server" pkg="map_server" type="map_server" args="$(find env_description)/maps/maze.yaml">
-        <param name="frame_id" value="/map"/>
-    </node>
-    <node name="tf_broadcast" pkg="simulator" type="tf_broadcast.py"/>
-    <node name="rviz" pkg="rviz" type="rviz" args="-d robot_and_map.rviz"/> 
-</launch>
