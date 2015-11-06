@@ -8,8 +8,16 @@ catkin_make
 echo "source $(pwd)/devel/setup.bash" >> ~/.bashrc
 source ~/.bashrc
 
-2. To Launch 
-cd <repo>/src
+2. Compile Code:
+cd <repo>
+catkin_make 
+
+3. To Start Simulator & Rviz
+cd <repo>
 roslaunch robot_and_map.launch
 
+4. Sample code which generates a path and publish is at <repo>/src/path_planner/path_generator.py
+To run sample path generator:
+
+rosrun path_planner path_generator.py
 
