@@ -1,0 +1,22 @@
+<launch>
+    <!--
+        ROBOT MODEL: pioneer 3at
+        ORIGINAL LAUNCH FILE: <include file="$(find p2os_urdf)/launch/pioneer3at_urdf.launch"/>
+        TODO: remove robot frame, only keep stl for visualization
+     -->
+    <include file="$(find p2os_urdf)/launch/upload_pioneer3at.xml"/>
+    <node pkg="robot_state_publisher" type="state_publisher" name="robot_state_publisher">
+        <param name="publish_frequency" type="double" value="100.0"/>
+        <param name="tf_prefix" type="string" value=""/>
+    </node>
+    <node pkg="p2os_urdf" type="p2os_publisher_3at" name="publisher"/>
+
+    <node name="map_server" pkg="map_server" type="map_server" args="$(find env_description)/maps/maze.yaml">
+        <param name="frame_id" value="/map"/>
+    </node>
+
+    <node name="tf_broadcast" pkg="simulator" type="tf_broadcast.py"/>
+    <node name="path_follower" pkg="simulator" type="path_follower.py"/>
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find simulator)/robot_and_map.rviz"/> 
+</launch>
