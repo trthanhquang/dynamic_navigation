@@ -45,21 +45,25 @@ if __name__ == '__main__':
     
     r = rospy.Rate(100)
     while not rospy.is_shutdown():
+        t = rospy.Time.now().to_sec()
+        ps = PoseStamped()
+        ps.header.stamp = rospy.Time.from_sec(t)
+
         if global_path!=None:
             tL,xL,yL,yawL = global_path
 
-            t = rospy.Time.now().to_sec()
             x = np.interp(t,tL,xL)
             y = np.interp(t,tL,yL)
             yaw = np.interp(t,tL,yawL)
 
-            ps = PoseStamped()
-            ps.header.stamp = rospy.Time.from_sec(t)
-            ps.pose.position = Point(*([x,y,0]))
-        
+            ps.pose.position = Point(*([x,y,0]))        
             q = quaternion_from_euler(0,0,yaw)
             ps.pose.orientation = Quaternion(*q)
-            
-            posePub.publish(ps)
 
+        else:
+            ps.pose.position = Point(*([2,2,0]))
+            q = quaternion_from_euler(0,0,np.pi/4)
+            ps.pose.orientation = Quaternion(*q)
+
+        posePub.publish(ps)
         r.sleep()
