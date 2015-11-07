@@ -1,6 +1,7 @@
 #include "ros/ros.h"
 #include "nav_msgs/OccupancyGrid.h"
 #include "geometry_msgs/PoseStamped.h"
+#include "djistra_planner.h"
 
 //some transform API documentaion: http://docs.ros.org/api/tf/html/c++/transform__datatypes_8h.html
 #include "tf/transform_datatypes.h" 
@@ -10,13 +11,13 @@
 bool is_map_initialized = false;
 bool is_pose_initialized = false;
 
-nav_msgs::OccupancyGrid map;
+nav_msgs::OccupancyGrid global_map;
 geometry_msgs::PoseStamped current_pose;
 
 void mapCallback(const nav_msgs::OccupancyGrid& msg)
 {
     is_map_initialized = true;
-    map = msg;
+    global_map = msg;
 }
 
 void poseCallback(const geometry_msgs::PoseStamped& msg)
@@ -39,10 +40,10 @@ int main(int argc, char **argv){
                       << ", y " << current_pose.pose.position.y
                       << ", theta(rad) " << tf::getYaw(current_pose.pose.orientation) <<std::endl;
 
-            std::vector<int8_t> data = map.data;
-            std::cout << "Map Info: width " << map.info.width 
-                      << ", height " << map.info.height
-                      << ", data vector size: " << data.size() 
+            std::vector<int8_t> data = global_map.data;
+            std::cout << "Map Info: width " << global_map.info.width 
+                      << ", height " << global_map.info.height
+                      << ", data vector size: " << global_map.data.size() 
                       << std::endl;
         }
         ros::spinOnce();
