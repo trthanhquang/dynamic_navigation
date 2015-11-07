@@ -1,7 +1,7 @@
 #include "ros/ros.h"
 #include "nav_msgs/OccupancyGrid.h"
 #include "geometry_msgs/PoseStamped.h"
-#include "djistra_planner.h"
+#include "dijkstra_planner.h"
 
 //some transform API documentaion: http://docs.ros.org/api/tf/html/c++/transform__datatypes_8h.html
 #include "tf/transform_datatypes.h" 

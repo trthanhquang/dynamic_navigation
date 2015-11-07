@@ -1,5 +1,5 @@
-#ifndef DIJSTRA_PLANNER
-#define DIJSTRA_PLANNER
+#ifndef DIJKSTRA_PLANNER
+#define DIJKSTRA_PLANNER
 
 #include "ros/ros.h"
 #include "nav_msgs/OccupancyGrid.h"
@@ -21,9 +21,9 @@ using namespace std;
 typedef pair<int, int> pii;
 typedef pair<int, pii> pi3;
 
-class DijstraPlanner{
+class DijkstraPlanner{
 public:
-    DijstraPlanner(){
+    DijkstraPlanner(){
     }
     void setInit(double x, double y, double thetha);
     void setGoal(double x, double y, double thetha);
@@ -33,7 +33,7 @@ private:
     set<pii> blocked;
 };
 
-void DijstraPlanner::setMap(nav_msgs::OccupancyGrid occup_grid){
+void DijkstraPlanner::setMap(nav_msgs::OccupancyGrid occup_grid){
     int width = occup_grid.info.width;
     int height = occup_grid.info.height;
     //clear block
