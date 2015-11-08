@@ -39,12 +39,12 @@ private:
 };
 
 void DijkstraPlanner::setInit(double x, double y, double thetha){
-    this->initial_position = mp(x,y);
+    this->initial_position = mp(int(x),int(y));
     this->iy = thetha;
     std::cout<<"Init: " << x <<", "<< y <<", " << thetha <<std::endl;
 }
 void DijkstraPlanner::setGoal(double x, double y, double thetha){
-    this->terminus = mp(x,y);
+    this->terminus = mp(int(x),int(y));
     this->ty = thetha;
     std::cout<<"Goal: " << x <<", "<< y <<", " << thetha <<std::endl;    
 }
