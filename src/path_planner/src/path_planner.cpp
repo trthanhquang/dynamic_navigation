@@ -31,6 +31,7 @@ int main(int argc, char **argv){
     ros::NodeHandle n;
     ros::Subscriber mapSub  = n.subscribe("map", 1, mapCallback);
     ros::Subscriber poseSub = n.subscribe("current_pose", 1, poseCallback);
+    ros::Publisher path_pub =  n.advertise<nav_msgs::Path>("global_path",1000);
 
     ros::Rate loop_rate(10);
     std::cout << "Initializing..." << std::endl;
@@ -45,6 +46,15 @@ int main(int argc, char **argv){
                       << ", height " << global_map.info.height
                       << ", data vector size: " << global_map.data.size() 
                       << std::endl;
+
+            DijkstraPlanner solver;
+            solver.setInit(current_pose.pose.position.x, current_pose.pose.position.y, 
+                tf::getYaw(current_pose.pose.orientation));
+            solver.setGoal(1, 12.5, 3.14);
+            solver.setMap(global_map);
+            
+            nav_msgs::Path path = solver.solve_path();
+            path_pub.publish(path);
         }
         ros::spinOnce();
         loop_rate.sleep();
