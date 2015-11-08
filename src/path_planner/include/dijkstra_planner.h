@@ -111,7 +111,7 @@ nav_msgs::Path DijkstraPlanner::solve_path(){
     if (dist.find(terminus) != dist.end())
         for (pii i = terminus; dad.find(i) != dad.end(); i = dad[i]){
         vector<int> new_pose,pose=path_plan.back();
-        new_yaw=yaws[3*(pose[0]-i.first+(pose[0]<i.first))+pose[1]-i.second+(pose[1]<i.second)-1];
+        new_yaw=yaws[3*(abs(pose[0]-i.first)+(pose[0]<i.first))+abs(pose[1]-i.second)+(pose[1]<i.second)-1];
         if(new_yaw!=pose[2]){
             vector<int> new_pose_turn;
             new_pose_turn.pb(pose[0]);
@@ -131,10 +131,10 @@ nav_msgs::Path DijkstraPlanner::solve_path(){
        current_pose.header.stamp = ros::Time::now()+ros::Duration(ts++);
        string frame = "/map";
        current_pose.header.frame_id = frame.c_str();
-       vector<int> point3;
-       vector<double> point2;
-       point2.pb(point3[0]);
-       point2.pb(point3[1]);
+       vector<int> point3=*it;
+       //vector<double> point2;
+       //point2.pb(point3[0]);
+       //point2.pb(point3[1]);
        
        current_pose.pose.position.x=point3[0];
        current_pose.pose.position.y=point3[1];
