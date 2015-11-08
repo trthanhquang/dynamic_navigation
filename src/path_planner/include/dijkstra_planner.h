@@ -39,14 +39,18 @@ private:
 };
 
 void DijkstraPlanner::setInit(double x, double y, double thetha){
-    this->initial_position = mp(int(x),int(y));
+    int x1 = x/0.1;
+    int y1 = y/0.1;
+    this->initial_position = mp(x1,y1);
     this->iy = thetha;
-    std::cout<<"Init: " << x <<", "<< y <<", " << thetha <<std::endl;
+    std::cout<<"Init: " << x1 <<", "<< y1 <<", " << thetha <<std::endl;
 }
 void DijkstraPlanner::setGoal(double x, double y, double thetha){
-    this->terminus = mp(int(x),int(y));
+    int x1 = x/0.1;
+    int y1 = y/0.1;
+    this->terminus = mp(x1,y1);
     this->ty = thetha;
-    std::cout<<"Goal: " << x <<", "<< y <<", " << thetha <<std::endl;    
+    std::cout<<"Goal: " << x1 <<", "<< y1 <<", " << thetha <<std::endl;    
 }
 
 void DijkstraPlanner::setMap(nav_msgs::OccupancyGrid occup_grid){
@@ -56,14 +60,14 @@ void DijkstraPlanner::setMap(nav_msgs::OccupancyGrid occup_grid){
     this->xrange=mp(1,width);
     this->yrange=mp(1,height);
     //clear block
-    std::cout <<"map block: ";
+    // std::cout <<"map block: ";
     for(int yi=0; yi<width; yi++)
         for(int xi=0; xi<height; xi++)
             if(occup_grid.data[xi+yi*width] > 0){
                 this->blocked.insert(std::make_pair(xi,yi));
-                std::cout<<"(" << xi << "," << yi << ") ";
+                // std::cout<<"(" << xi << "," << yi << ") ";
             }
-    std::cout << std::endl;
+    // std::cout << std::endl;
 }
 
 nav_msgs::Path DijkstraPlanner::solve_path(){
@@ -136,8 +140,8 @@ nav_msgs::Path DijkstraPlanner::solve_path(){
        //point2.pb(point3[0]);
        //point2.pb(point3[1]);
        
-       current_pose.pose.position.x=point3[0];
-       current_pose.pose.position.y=point3[1];
+       current_pose.pose.position.x=point3[0]*0.1;
+       current_pose.pose.position.y=point3[1]*0.1;
        //current_pose.pose.position.w=0;
 
 

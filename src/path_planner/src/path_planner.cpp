@@ -50,11 +50,15 @@ int main(int argc, char **argv){
             DijkstraPlanner solver;
             solver.setInit(current_pose.pose.position.x, current_pose.pose.position.y, 
                 tf::getYaw(current_pose.pose.orientation));
+            // solver.setInit(2, 2, 3.14/4.0);
             solver.setGoal(1, 12.5, 3.14);
             solver.setMap(global_map);
-            
+
+            std::cout<< "solving path..." <<std::endl;
             nav_msgs::Path path = solver.solve_path();
+            std::cout<< "path len: " << path.poses.size() << std::endl;
             path_pub.publish(path);
+            std::cout<< "---------" << std::endl;
         }
         ros::spinOnce();
         loop_rate.sleep();
