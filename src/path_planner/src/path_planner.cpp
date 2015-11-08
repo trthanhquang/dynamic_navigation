@@ -35,6 +35,11 @@ int main(int argc, char **argv){
 
     ros::Rate loop_rate(10);
     std::cout << "Initializing..." << std::endl;
+    
+    bool anytime_replanning = false;
+    bool is_solved = false;
+    nav_msgs::Path path;
+
     while(ros::ok()){
         if (is_map_initialized && is_pose_initialized){
             std::cout << "Current Pose: x " << current_pose.pose.position.x
@@ -47,16 +52,32 @@ int main(int argc, char **argv){
                       << ", data vector size: " << global_map.data.size() 
                       << std::endl;
 
-            DijkstraPlanner solver;
-            solver.setInit(current_pose.pose.position.x, current_pose.pose.position.y, 
-                tf::getYaw(current_pose.pose.orientation));
-            // solver.setInit(2, 2, 3.14/4.0);
-            solver.setGoal(1, 12.5, 3.14);
-            solver.setMap(global_map);
+            if(anytime_replanning){
+                DijkstraPlanner solver;
+                solver.setInit(current_pose.pose.position.x, current_pose.pose.position.y, 
+                    tf::getYaw(current_pose.pose.orientation));
 
-            std::cout<< "solving path..." <<std::endl;
-            nav_msgs::Path path = solver.solve_path();
-            std::cout<< "path len: " << path.poses.size() << std::endl;
+                solver.setGoal(1, 12.5, 3.14);
+                solver.setMap(global_map);
+                
+                std::cout<< "[AnytimePlanning] solving path..." <<std::endl;
+                path = solver.solve_path();   
+                std::cout<< "path len: " << path.poses.size() << std::endl;
+            }else{
+                if(not is_solved){
+                    is_solved = true;
+
+                    //one time planning
+                    DijkstraPlanner solver;
+                    solver.setInit(2, 2, 3.14/4.0);
+                    solver.setGoal(1, 12.5, 3.14);
+                    solver.setMap(global_map);
+
+                    std::cout<< "[OneTimePlanning] solving path..." <<std::endl;
+                    path = solver.solve_path();   
+                    std::cout<< "path len: " << path.poses.size() << std::endl;
+                }
+            }
             path_pub.publish(path);
             std::cout<< "---------" << std::endl;
         }
