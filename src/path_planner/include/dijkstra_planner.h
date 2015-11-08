@@ -64,7 +64,9 @@ void DijkstraPlanner::setMap(nav_msgs::OccupancyGrid occup_grid){
     for(int yi=0; yi<width; yi++)
         for(int xi=0; xi<height; xi++)
             if(occup_grid.data[xi+yi*width] > 0){
-                this->blocked.insert(std::make_pair(xi,yi));
+		for(int a=max(0,xi-4);a<min(height,xi+5);a++)
+			for(int b=max(0,yi-4);b<min(width,yi+5);b++)
+                		this->blocked.insert(std::make_pair(a,b));
                 // std::cout<<"(" << xi << "," << yi << ") ";
             }
     // std::cout << std::endl;
@@ -103,8 +105,8 @@ nav_msgs::Path DijkstraPlanner::solve_path(){
         }
     }
    
-    vector<vector<int> > path_plan;
-    vector<int> tpose;
+    vector<vector<double> > path_plan;
+    vector<double> tpose;
     tpose.pb(terminus.first);
     tpose.pb(terminus.second);
     tpose.pb(this->ty);
@@ -114,10 +116,10 @@ nav_msgs::Path DijkstraPlanner::solve_path(){
     double yaws[9]={0,M_PI/2,3*M_PI/2,0,M_PI/4,7*M_PI/4,M_PI,3*M_PI/4,5*M_PI/4};
     if (dist.find(terminus) != dist.end())
         for (pii i = terminus; dad.find(i) != dad.end(); i = dad[i]){
-        vector<int> new_pose,pose=path_plan.back();
-        new_yaw=yaws[3*(abs(pose[0]-i.first)+(pose[0]<i.first))+abs(pose[1]-i.second)+(pose[1]<i.second)-1];
+        vector<double> new_pose,pose=path_plan.back();
+        new_yaw=yaws[int(3*(abs(pose[0]-i.first)+(pose[0]<i.first))+abs(pose[1]-i.second)+(pose[1]<i.second))];
         if(new_yaw!=pose[2]){
-            vector<int> new_pose_turn;
+            vector<double> new_pose_turn;
             new_pose_turn.pb(pose[0]);
                     new_pose_turn.pb(pose[1]);
                     new_pose_turn.pb(new_yaw);
@@ -129,13 +131,13 @@ nav_msgs::Path DijkstraPlanner::solve_path(){
         path_plan.pb(new_pose);
     }
     vector<geometry_msgs::PoseStamped> path_points;
-    int ts=0;
-    for(vector<vector<int> >::reverse_iterator it=path_plan.rbegin();it!=path_plan.rend();it++){
+    double ts=0;
+    for(vector<vector<double> >::reverse_iterator it=path_plan.rbegin();it!=path_plan.rend();it++){
            geometry_msgs::PoseStamped current_pose;
-       current_pose.header.stamp = ros::Time::now()+ros::Duration(ts++);
+       current_pose.header.stamp = ros::Time::now()+ros::Duration(ts);ts+=0.2;
        string frame = "/map";
        current_pose.header.frame_id = frame.c_str();
-       vector<int> point3=*it;
+       vector<double> point3=*it;
        //vector<double> point2;
        //point2.pb(point3[0]);
        //point2.pb(point3[1]);
