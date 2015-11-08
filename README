@@ -31,4 +31,10 @@ Which can be simplified to: footprint = [ [0.3302, -0.254], [0.3302,  0.254], [-
 
 7. Initial Pose of the Robot: x=2, y=2, yaw=45degree
 
+8. Some debuging tip if path_planner have segfault
+
+install valgrind! (should be available on apt-get) Then create launch file to launch the node with launch-prefix="valgrind" (example in <repo>/valgrind_path_planner.launch)
+
+catkin_make -DCMAKE_BUILD_TYPE=Debug --pkg path_planner
+roslaunch valgrind_path_planner.launch
 
