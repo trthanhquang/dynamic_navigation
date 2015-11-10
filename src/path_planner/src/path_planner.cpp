@@ -30,6 +30,8 @@ How to run:
 //ros_msgs
 #include "nav_msgs/OccupancyGrid.h"
 #include "geometry_msgs/PoseStamped.h"
+#include "path_planner/PoseVel.h"
+#include "path_planner/PoseVelArray.h"
 //ros_services
 #include "nav_msgs/GetMap.h" 
 
@@ -45,6 +47,8 @@ bool anytime_replanning = true;
 
 boost::shared_ptr<nav_msgs::OccupancyGrid> global_obstacle_map;
 boost::shared_ptr<nav_msgs::OccupancyGrid> global_static_map;
+boost::shared_ptr<path_planner::PoseVelArray> obstacle_posevel_list;
+
 geometry_msgs::PoseStamped current_pose;
 
 double goal_x = 1;
@@ -55,10 +59,25 @@ void obstacleMapCallback(boost::shared_ptr<nav_msgs::OccupancyGrid> msg){
     global_obstacle_map = msg;
 }
 
+void obsPoseVelCallback(boost::shared_ptr<path_planner::PoseVelArray> msg){
+    obstacle_posevel_list = msg;
+}
+
 void poseCallback(const geometry_msgs::PoseStamped& msg)
 {
     is_pose_initialized = true;
     current_pose = msg;
+}
+
+void goalPoseCallback(const geometry_msgs::PoseStamped& msg)
+{
+    goal_x = msg.pose.position.x;
+    goal_y = msg.pose.position.y;
+    goal_yaw = tf::getYaw(msg.pose.orientation);
+
+    std::cout << "Receiving new goal: x=" <<goal_x
+              << ", y=" << goal_y <<", yaw=" << goal_yaw 
+              << std::endl;
 }
 
 int main(int argc, char **argv){
@@ -77,8 +96,10 @@ int main(int argc, char **argv){
     std::cout << "Initializing ROS..." << std::endl;
 
     ros::Subscriber poseSub = n.subscribe("current_pose", 1, poseCallback);
+    ros::Subscriber navigationGoalSub = n.subscribe("move_base_simple/goal", 1, goalPoseCallback);
     ros::Subscriber obsMapSub = n.subscribe("obstacle_cost_map", 1, obstacleMapCallback);
-    ros::Publisher pathPub =  n.advertise<nav_msgs::Path>("global_path",1);
+    ros::Subscriber obsPoseVelSub = n.subscribe("obstacle_posevel_array", 1, obsPoseVelCallback);
+    ros::Publisher pathPub =  n.advertise<nav_msgs::Path>("global_path",10);
     
     //Get map from map_server
     ros::ServiceClient client = n.serviceClient<nav_msgs::GetMap>("static_map");
@@ -105,13 +126,13 @@ int main(int argc, char **argv){
                       << ", y " << current_pose.pose.position.y
                       << ", theta(rad) " << tf::getYaw(current_pose.pose.orientation) <<std::endl;
 
-            if(global_obstacle_map){
-                std::cout << "Obstacle Map received. width " << global_obstacle_map->info.width 
-                  << ", height " << global_obstacle_map->info.height
-                  << ", resolution " << global_obstacle_map->info.resolution
-                  << ", data length: " << global_obstacle_map->data.size() 
-                  << std::endl;
-            }
+            // if(global_obstacle_map){
+            //     std::cout << "Obstacle Map received. width " << global_obstacle_map->info.width 
+            //       << ", height " << global_obstacle_map->info.height
+            //       << ", resolution " << global_obstacle_map->info.resolution
+            //       << ", data length: " << global_obstacle_map->data.size() 
+            //       << std::endl;
+            // }
 
             DijkstraPlanner solver;
             solver.setInitTime(ros::Time::now());
@@ -119,9 +140,12 @@ int main(int argc, char **argv){
                                tf::getYaw(current_pose.pose.orientation));
             solver.setGoalPose(goal_x, goal_y, goal_yaw);
             solver.setStaticMap(global_static_map);
-            if(global_obstacle_map){
-                solver.setObstaclesMap(global_obstacle_map);
-            }
+            
+            if(obstacle_posevel_list)
+                solver.setObstacleList(obstacle_posevel_list);
+
+            // if(global_obstacle_map)
+            //     solver.setObstaclesMap(global_obstacle_map);
 
             std::cout<< "[AnytimePlanning] solving path..." <<std::endl;
             path = solver.findPath();   

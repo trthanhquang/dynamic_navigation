@@ -32,6 +32,7 @@ public:
     void setGoalPose(double x, double y, double thetha);
     void setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> occup_grid);
     void setObstaclesMap(boost::shared_ptr<nav_msgs::OccupancyGrid> occup_grid);
+    void setObstacleList(boost::shared_ptr<path_planner::PoseVelArray> obs_list);
     nav_msgs::Path findPath(void);
 private:
     ros::Time current_time;
@@ -78,24 +79,21 @@ void DijkstraPlanner::setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> st
             }
 }
 
-//@Satyam, please fill in here.
-void DijkstraPlanner::setObstaclesMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_grid){
-    int width = obs_grid->info.width;
-    int height = obs_grid->info.height;
-    
-    // 0.1 = obs_grid->info.resolution;
-    // this->xrange=mp(1,width);
-    // this->yrange=mp(1,height);
-
-    // for(int yi=0; yi<width; yi++)
-    //     for(int xi=0; xi<height; xi++)
-    //         if(obs_grid->data[xi+yi*width] > 0)
-    //         {
-    //             for(int a=max(0,xi-4);a<min(height,xi+5);a++)
-    //                 for(int b=max(0,yi-4);b<min(width,yi+5);b++)
-    //                     this->blocked.insert(std::make_pair(a,b));
-    //         }
+void DijkstraPlanner::setObstacleList(boost::shared_ptr<path_planner::PoseVelArray> obs_list){
+    std::cout << "Detect Obstacles: " << obs_list->data.size() << std::endl;
+    for(int i=0; i<obs_list->data.size(); i++){
+        std::cout << "obstacle " << i 
+                  << ", x=" << obs_list->data[i].pose.position.x 
+                  << ", y=" << obs_list->data[i].pose.position.y 
+                  << ", yaw=" << tf::getYaw(obs_list->data[i].pose.orientation)
+                  << ", vel=" << obs_list->data[i].vel
+                  << std::endl;
+    }
 }
+
+void DijkstraPlanner::setObstaclesMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_grid){
+}
+
 nav_msgs::Path DijkstraPlanner::findPath(){
     //declarations
     priority_queue<pi3, vector<pi3>, greater<pi3> > Q;
