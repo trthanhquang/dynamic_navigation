@@ -28,6 +28,7 @@ obstacles_list = [
 
 SENSORS_RADIUS = 6
 current_pose = None
+static_map = None 
 
 def generate_vel_profile():
     for obstacle in obstacles_list:
@@ -65,7 +66,7 @@ def get_static_map():
         print "Service call failed: %s"%e
         return None
 
-def find_cells(x,y,radius,tolerant=0.05,grid_resolution=0.1):
+def find_cells(x,y,radius,tolerant=0.2,grid_resolution=0.1):
     x_i = int(x/grid_resolution)
     y_i = int(y/grid_resolution)
     r_i = int((radius+tolerant)/grid_resolution)
@@ -85,6 +86,22 @@ def find_cells(x,y,radius,tolerant=0.05,grid_resolution=0.1):
 def poseCallback(msg):
     global current_pose
     current_pose = msg
+
+def link_free_check(x1,y1, x2,y2):
+    global static_map
+
+    x0 = np.array([x1, y1])
+    vec = np.array([x2-x1, y2-y1])
+    length = (vec[0]**2 + vec[1]**2)**0.5
+    
+
+    for scale in np.append(np.arange(0,length,0.1),length):
+        (x,y) = x0 + scale/length*vec
+        xi = int(x/0.1)
+        yi = int(y/0.1)
+        if static_map.data[xi+yi*static_map.info.width] > 0:
+            return False
+    return True
 
 if __name__ == '__main__':
     rospy.init_node('obstacle_broadcaster')
@@ -131,9 +148,6 @@ if __name__ == '__main__':
             
             ma.markers.append(m)
             
-            for xi,yi in find_cells(m.pose.position.x, m.pose.position.y,0.5):
-                obs_map.data[xi+yi*obs_map.info.width]=100
-
             v = np.interp(t, obstacle['v_profile']['t'], obstacle['v_profile']['v'])
 
             if current_pose!=None:
@@ -142,14 +156,20 @@ if __name__ == '__main__':
                 d = (dx**2 + dy**2)**0.5
                 
                 if d < SENSORS_RADIUS:
+                    link_free = link_free_check(m.pose.position.x, m.pose.position.y,
+                        current_pose.pose.position.x, current_pose.pose.position.y)
+                    if link_free:
+                        
+                        for xi,yi in find_cells(m.pose.position.x, m.pose.position.y,0.5):
+                            obs_map.data[xi+yi*obs_map.info.width]=100
 
-                    pv = PoseVel()
-                    pv.pose.position.x = m.pose.position.x
-                    pv.pose.position.y = m.pose.position.y
-                    pv.pose.orientation.w = m.pose.orientation.w
-                    pv.vel = v
-                    
-                    obs_pv_arrays.data.append(pv)
+                        pv = PoseVel()
+                        pv.pose.position.x = m.pose.position.x
+                        pv.pose.position.y = m.pose.position.y
+                        pv.pose.orientation.w = m.pose.orientation.w
+                        pv.vel = v
+                        
+                        obs_pv_arrays.data.append(pv)
 
         # publishing msgs
         occupacy_pub.publish(obs_map)
