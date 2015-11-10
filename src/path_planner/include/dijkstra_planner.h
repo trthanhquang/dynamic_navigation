@@ -27,52 +27,58 @@ class DijkstraPlanner{
 public:
     DijkstraPlanner(){
     }
-    void setInit(double x, double y, double thetha);
-    void setGoal(double x, double y, double thetha);
-    void setMap(nav_msgs::OccupancyGrid occup_grid);
-    nav_msgs::Path solve_path(void);
+    void setInitTime(ros::Time now);
+    void setInitPose(double x, double y, double thetha);
+    void setGoalPose(double x, double y, double thetha);
+    void setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> occup_grid);
+    nav_msgs::Path findPath(void);
 private:
+    ros::Time current_time;
     set<pii> blocked;
     pii xrange, yrange;
     pii initial_position, terminus;
     double iy,ty;
+    double map_resolution;
 };
 
-void DijkstraPlanner::setInit(double x, double y, double thetha){
-    int x1 = x/0.1;
-    int y1 = y/0.1;
+void DijkstraPlanner::setInitTime(ros::Time now){
+    current_time = now;
+}
+
+void DijkstraPlanner::setInitPose(double x, double y, double thetha){
+    int x1 = x/this->map_resolution;
+    int y1 = y/this->map_resolution;
     this->initial_position = mp(x1,y1);
     this->iy = thetha;
     std::cout<<"Init: " << x1 <<", "<< y1 <<", " << thetha <<std::endl;
 }
-void DijkstraPlanner::setGoal(double x, double y, double thetha){
-    int x1 = x/0.1;
-    int y1 = y/0.1;
+void DijkstraPlanner::setGoalPose(double x, double y, double thetha){
+    int x1 = x/this->map_resolution;
+    int y1 = y/this->map_resolution;
     this->terminus = mp(x1,y1);
     this->ty = thetha;
     std::cout<<"Goal: " << x1 <<", "<< y1 <<", " << thetha <<std::endl;    
 }
 
-void DijkstraPlanner::setMap(nav_msgs::OccupancyGrid occup_grid){
-    int width = occup_grid.info.width;
-    int height = occup_grid.info.height;
+void DijkstraPlanner::setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> static_map){
+    int width = static_map->info.width;
+    int height = static_map->info.height;
     
+    this->map_resolution = static_map->info.resolution;
     this->xrange=mp(1,width);
     this->yrange=mp(1,height);
-    //clear block
-    // std::cout <<"map block: ";
+
     for(int yi=0; yi<width; yi++)
         for(int xi=0; xi<height; xi++)
-            if(occup_grid.data[xi+yi*width] > 0){
-		for(int a=max(0,xi-4);a<min(height,xi+5);a++)
-			for(int b=max(0,yi-4);b<min(width,yi+5);b++)
-                		this->blocked.insert(std::make_pair(a,b));
-                // std::cout<<"(" << xi << "," << yi << ") ";
+            if(static_map->data[xi+yi*width] > 0)
+            {
+                for(int a=max(0,xi-4);a<min(height,xi+5);a++)
+                    for(int b=max(0,yi-4);b<min(width,yi+5);b++)
+                        this->blocked.insert(std::make_pair(a,b));
             }
-    // std::cout << std::endl;
 }
 
-nav_msgs::Path DijkstraPlanner::solve_path(){
+nav_msgs::Path DijkstraPlanner::findPath(){
     //declarations
     priority_queue<pi3, vector<pi3>, greater<pi3> > Q;
     map<pii, int> dist;
@@ -133,21 +139,15 @@ nav_msgs::Path DijkstraPlanner::solve_path(){
     vector<geometry_msgs::PoseStamped> path_points;
     double ts=0;
     for(vector<vector<double> >::reverse_iterator it=path_plan.rbegin();it!=path_plan.rend();it++){
-           geometry_msgs::PoseStamped current_pose;
-       current_pose.header.stamp = ros::Time::now()+ros::Duration(ts);ts+=0.2;
-       string frame = "/map";
-       current_pose.header.frame_id = frame.c_str();
-       vector<double> point3=*it;
-       //vector<double> point2;
-       //point2.pb(point3[0]);
-       //point2.pb(point3[1]);
-       
-       current_pose.pose.position.x=point3[0]*0.1;
-       current_pose.pose.position.y=point3[1]*0.1;
-       //current_pose.pose.position.w=0;
+        geometry_msgs::PoseStamped current_pose;
+        current_pose.header.stamp = current_time+ros::Duration(ts);ts+=0.2;
+        string frame = "/map";
+        current_pose.header.frame_id = frame.c_str();
+        vector<double> point3=*it;
 
+        current_pose.pose.position.x=point3[0]*this->map_resolution;
+        current_pose.pose.position.y=point3[1]*this->map_resolution;
 
-        //tf::Quaternion qtn=tf::createQuaternionMsgFromYaw(point3[2]);;
         geometry_msgs::Quaternion yawor=tf::createQuaternionMsgFromYaw(point3[2]);;
         //tf.quaternionTFToMsg(qtn,yawor);
         current_pose.pose.orientation = yawor;
