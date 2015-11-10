@@ -119,7 +119,10 @@ int main(int argc, char **argv){
                                tf::getYaw(current_pose.pose.orientation));
             solver.setGoalPose(goal_x, goal_y, goal_yaw);
             solver.setStaticMap(global_static_map);
-            
+            if(global_obstacle_map){
+                solver.setObstaclesMap(global_obstacle_map);
+            }
+
             std::cout<< "[AnytimePlanning] solving path..." <<std::endl;
             path = solver.findPath();   
             std::cout<< "path len: " << path.poses.size() << std::endl;

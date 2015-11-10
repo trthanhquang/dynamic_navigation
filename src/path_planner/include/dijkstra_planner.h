@@ -31,6 +31,7 @@ public:
     void setInitPose(double x, double y, double thetha);
     void setGoalPose(double x, double y, double thetha);
     void setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> occup_grid);
+    void setObstaclesMap(boost::shared_ptr<nav_msgs::OccupancyGrid> occup_grid);
     nav_msgs::Path findPath(void);
 private:
     ros::Time current_time;
@@ -60,17 +61,17 @@ void DijkstraPlanner::setGoalPose(double x, double y, double thetha){
     std::cout<<"Goal: " << x1 <<", "<< y1 <<", " << thetha <<std::endl;    
 }
 
-void DijkstraPlanner::setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> static_map){
-    int width = static_map->info.width;
-    int height = static_map->info.height;
+void DijkstraPlanner::setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> static_grid){
+    int width = static_grid->info.width;
+    int height = static_grid->info.height;
     
-    this->map_resolution = static_map->info.resolution;
+    this->map_resolution = static_grid->info.resolution;
     this->xrange=mp(1,width);
     this->yrange=mp(1,height);
 
     for(int yi=0; yi<width; yi++)
         for(int xi=0; xi<height; xi++)
-            if(static_map->data[xi+yi*width] > 0)
+            if(static_grid->data[xi+yi*width] > 0)
             {
                 for(int a=max(0,xi-4);a<min(height,xi+5);a++)
                     for(int b=max(0,yi-4);b<min(width,yi+5);b++)
@@ -78,6 +79,24 @@ void DijkstraPlanner::setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> st
             }
 }
 
+//@Satyam, please fill in here.
+void DijkstraPlanner::setObstaclesMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_grid){
+    int width = obs_grid->info.width;
+    int height = obs_grid->info.height;
+    
+    // this->map_resolution = obs_grid->info.resolution;
+    // this->xrange=mp(1,width);
+    // this->yrange=mp(1,height);
+
+    // for(int yi=0; yi<width; yi++)
+    //     for(int xi=0; xi<height; xi++)
+    //         if(obs_grid->data[xi+yi*width] > 0)
+    //         {
+    //             for(int a=max(0,xi-4);a<min(height,xi+5);a++)
+    //                 for(int b=max(0,yi-4);b<min(width,yi+5);b++)
+    //                     this->blocked.insert(std::make_pair(a,b));
+    //         }
+}
 nav_msgs::Path DijkstraPlanner::findPath(){
     //declarations
     priority_queue<pi3, vector<pi3>, greater<pi3> > Q;
