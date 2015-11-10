@@ -52,6 +52,10 @@ if __name__ == '__main__':
         if global_path!=None:
             tL,xL,yL,yawL = global_path
 
+            if len(tL) <= 1:
+                print 'INVALID path length'
+                continue
+            
             x = np.interp(t,tL,xL)
             y = np.interp(t,tL,yL)
             yaw = np.interp(t,tL,yawL)
