@@ -150,9 +150,12 @@ int main(int argc, char **argv){
             std::cout<< "[AnytimePlanning] solving path..." <<std::endl;
             path = solver.findPath();   
             std::cout<< "path len: " << path.poses.size() << std::endl;
-
-            pathPub.publish(path);
-            std::cout<< "---------" << std::endl;
+            if(path.poses.size()==1){
+                std::cout<< "path invalid, only contains one waypoint: " << path.poses[0].pose << std::endl;
+            }else{
+                pathPub.publish(path);
+                std::cout<< "---------" << std::endl;
+            }
         }
         ros::spinOnce();
         loop_rate.sleep();
