@@ -19,21 +19,34 @@
 #define mp make_pair
 #define pb push_back
 
+#define K_MAX 2.0 // max turning radius = 0.5m
+#define V_MAX 1.6 // (m/s)
+#define GRID_RESOLUTION 0.1 // (m)
+
 using namespace std;
 typedef pair<int, int> pii;
 typedef pair<int, pii> pi3;
+
+struct Pose2D{
+    double x;
+    double y;
+    double theta;
+};
 
 class DijkstraPlanner{
 public:
     DijkstraPlanner(){
     }
-    void setInitTime(ros::Time now);
-    void setInitPose(double x, double y, double thetha);
-    void setGoalPose(double x, double y, double thetha);
+    void setCurrentTime(ros::Time now);
+    void setCurrentPose(Pose2D current_pose);
+    void setGoalPose(Pose2D goal_pose);
     void setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> occup_grid);
     void setObstaclesMap(boost::shared_ptr<nav_msgs::OccupancyGrid> occup_grid);
     void setObstacleList(boost::shared_ptr<path_planner::PoseVelArray> obs_list);
     nav_msgs::Path findPath(void);
+    
+    vector<Pose2D> searchNextPoses(Pose2D pose, double output_size, double vel, double dt);
+
 private:
     ros::Time current_time;
     set<pii> blocked;
@@ -43,23 +56,59 @@ private:
     double map_resolution;
 };
 
-void DijkstraPlanner::setInitTime(ros::Time now){
+vector<Pose2D> DijkstraPlanner::searchNextPoses(Pose2D cur_pose, double output_size, double vel, double dt){
+    vector<Pose2D> nexts;
+    double ds = vel*dt;
+
+    cout << "current pose: " << cur_pose.x <<", " << cur_pose.y << ", " << cur_pose.theta << endl;
+    if(output_size>1){
+        double dk = (2.0*K_MAX)/(output_size-1);
+        for(int i=0;i<output_size;i++){
+            double k = -K_MAX + dk*i;
+            double dtheta = k*ds;
+            double new_theta = cur_pose.theta + dtheta;
+            double dx = ds*sin(new_theta);
+            double dy = ds*cos(new_theta);
+            
+            //wrap yaw in [0..2pi)
+            while (new_theta >= 2.0*M_PI){
+                new_theta -= 2.0*M_PI;
+            }
+            while (new_theta < 0){
+                new_theta += 2.0*M_PI;
+            }
+
+            Pose2D next;
+            next.x = cur_pose.x + dx;
+            next.y = cur_pose.y + dy;
+            next.theta = new_theta;
+
+            cout << "next pose: " << next.x <<", " << next.y << ", " << next.theta << endl;
+            nexts.push_back(next);
+        }
+    }
+
+    return nexts;
+}
+
+void DijkstraPlanner::setCurrentTime(ros::Time now){
     current_time = now;
 }
 
-void DijkstraPlanner::setInitPose(double x, double y, double thetha){
-    int x1 = x/0.1;
-    int y1 = y/0.1;
+void DijkstraPlanner::setCurrentPose(Pose2D current_pose){
+    int x1 = current_pose.x/GRID_RESOLUTION;
+    int y1 = current_pose.y/GRID_RESOLUTION;
     this->initial_position = mp(x1,y1);
-    this->iy = thetha;
-    std::cout<<"Init: " << x1 <<", "<< y1 <<", " << thetha <<std::endl;
+    this->iy = current_pose.theta;
+    std::cout<<"Init: " << x1 <<", "<< y1 <<", " << current_pose.theta <<std::endl;
 }
-void DijkstraPlanner::setGoalPose(double x, double y, double thetha){
-    int x1 = x/0.1;
-    int y1 = y/0.1;
+
+void DijkstraPlanner::setGoalPose(Pose2D goal_pose){
+    int x1 = goal_pose.x/GRID_RESOLUTION;
+    int y1 = goal_pose.y/GRID_RESOLUTION;
     this->terminus = mp(x1,y1);
-    this->ty = thetha;
-    std::cout<<"Goal: " << x1 <<", "<< y1 <<", " << thetha <<std::endl;    
+    this->ty = goal_pose.theta;
+    std::cout<<"Goal: " << x1 <<", "<< y1 <<", " << goal_pose.theta <<std::endl;
 }
 
 void DijkstraPlanner::setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> static_grid){
@@ -161,8 +210,8 @@ nav_msgs::Path DijkstraPlanner::findPath(){
         current_pose.header.frame_id = frame.c_str();
         vector<double> point3=*it;
 
-        current_pose.pose.position.x=point3[0]*0.1;
-        current_pose.pose.position.y=point3[1]*0.1;
+        current_pose.pose.position.x=point3[0]*GRID_RESOLUTION;
+        current_pose.pose.position.y=point3[1]*GRID_RESOLUTION;
 
         geometry_msgs::Quaternion yawor=tf::createQuaternionMsgFromYaw(point3[2]);;
         //tf.quaternionTFToMsg(qtn,yawor);

@@ -120,39 +120,40 @@ int main(int argc, char **argv){
     ros::Rate loop_rate(10);
     nav_msgs::Path path;
 
+    DijkstraPlanner solver;
+    solver.setStaticMap(global_static_map);
+
     while(ros::ok()){
         if (is_pose_initialized){
             std::cout << "Current Pose: x " << current_pose.pose.position.x
                       << ", y " << current_pose.pose.position.y
                       << ", theta(rad) " << tf::getYaw(current_pose.pose.orientation) <<std::endl;
+            
+            Pose2D start_2dpose, goal_2dpose;
 
-            // if(global_obstacle_map){
-            //     std::cout << "Obstacle Map received. width " << global_obstacle_map->info.width 
-            //       << ", height " << global_obstacle_map->info.height
-            //       << ", resolution " << global_obstacle_map->info.resolution
-            //       << ", data length: " << global_obstacle_map->data.size() 
-            //       << std::endl;
-            // }
+            start_2dpose.x = current_pose.pose.position.x;
+            start_2dpose.y = current_pose.pose.position.y;
+            start_2dpose.theta = tf::getYaw(current_pose.pose.orientation);
 
-            DijkstraPlanner solver;
-            solver.setInitTime(ros::Time::now());
-            solver.setInitPose(current_pose.pose.position.x, current_pose.pose.position.y, 
-                               tf::getYaw(current_pose.pose.orientation));
-            solver.setGoalPose(goal_x, goal_y, goal_yaw);
-            solver.setStaticMap(global_static_map);
+            goal_2dpose.x = goal_x;
+            goal_2dpose.y = goal_y;
+            goal_2dpose.theta = goal_yaw;
+
+            solver.searchNextPoses(start_2dpose, 5, 1.6, 0.2);
+
+            solver.setCurrentTime(ros::Time::now());
+            solver.setCurrentPose(start_2dpose);
+            solver.setGoalPose(goal_2dpose);
             
             if(obstacle_posevel_list)
                 solver.setObstacleList(obstacle_posevel_list);
 
-            // if(global_obstacle_map)
-            //     solver.setObstaclesMap(global_obstacle_map);
-
             std::cout<< "[AnytimePlanning] solving path..." <<std::endl;
-            path = solver.findPath();   
+            path = solver.findPath();
             std::cout<< "path len: " << path.poses.size() << std::endl;
-
-            if(path.poses.size()==1){
-                std::cout<< "invalid path!" << std::endl;
+            
+            if(path.poses.size() < 2){
+                std::cout<< "Invalid path! output path need to have at least 2 waypoints" << std::endl;
             }else{
                 pathPub.publish(path);
                 std::cout<< "---------" << std::endl;
