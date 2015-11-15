@@ -7,6 +7,9 @@ from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
 import numpy as np 
 
+current_pose = None
+global_path = None
+
 def path_to_list(path):
     tL = []
     xL = []
@@ -23,9 +26,9 @@ def path_to_list(path):
         yaw = rpy[2] % (2*np.pi)
         
         if len(yawL)>0:
-            while (yaw - yawL[-1]) >= 2*np.pi:
+            while (yaw - yawL[-1]) >= np.pi:
                 yaw -= 2*np.pi
-            while yaw - yawL[-1] <= -2*np.pi:
+            while yaw - yawL[-1] < -np.pi:
                 yaw += 2*np.pi
         yawL.append(yaw)
         
@@ -36,8 +39,7 @@ def path_callback(msg):
     global_path = path_to_list(msg)
 
 if __name__ == '__main__':
-    global posePub, global_path
-    global_path = None
+    global posePub, global_path, current_pose
 
     rospy.init_node("path_follower")
     rospy.Subscriber("global_path",Path,path_callback)
@@ -60,14 +62,17 @@ if __name__ == '__main__':
             y = np.interp(t,tL,yL)
             yaw = np.interp(t,tL,yawL)
 
+            # print 'dt:', t-tL[0], 'dx: ',x-xL[0], 'dy: ',y-yL[0]
+
             ps.pose.position = Point(*([x,y,0]))        
             q = quaternion_from_euler(0,0,yaw)
             ps.pose.orientation = Quaternion(*q)
-
         else:
             ps.pose.position = Point(*([2,2,0]))
             q = quaternion_from_euler(0,0,np.pi/4)
             ps.pose.orientation = Quaternion(*q)
+
+        current_pose = ps.pose
 
         posePub.publish(ps)
         r.sleep()

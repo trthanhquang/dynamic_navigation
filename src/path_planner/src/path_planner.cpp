@@ -43,6 +43,7 @@ How to run:
 #include <vector>
 
 bool is_pose_initialized = false;
+bool is_goal_initialized = false;
 bool anytime_replanning = true;
 
 boost::shared_ptr<nav_msgs::OccupancyGrid> global_obstacle_map;
@@ -51,9 +52,9 @@ boost::shared_ptr<path_planner::PoseVelArray> obstacle_posevel_list;
 
 geometry_msgs::PoseStamped current_pose;
 
-double goal_x = 1;
-double goal_y = 12.5;
-double goal_yaw = 3.14;
+double goal_x = 0;
+double goal_y = 0;
+double goal_yaw = 0;
 
 void obstacleMapCallback(boost::shared_ptr<nav_msgs::OccupancyGrid> msg){
     global_obstacle_map = msg;
@@ -69,11 +70,12 @@ void poseCallback(const geometry_msgs::PoseStamped& msg)
     current_pose = msg;
 }
 
-void goalPoseCallback(const geometry_msgs::PoseStamped& msg)
+void goalPoseCallback(const geometry_msgs::Pose& msg)
 {
-    goal_x = msg.pose.position.x;
-    goal_y = msg.pose.position.y;
-    goal_yaw = tf::getYaw(msg.pose.orientation);
+    is_goal_initialized = true;
+    goal_x = msg.position.x;
+    goal_y = msg.position.y;
+    goal_yaw = tf::getYaw(msg.orientation);
 
     std::cout << "Receiving new goal: x=" <<goal_x
               << ", y=" << goal_y <<", yaw=" << goal_yaw 
@@ -91,12 +93,12 @@ int main(int argc, char **argv){
         std::cout << "Goal configuration: x=" <<goal_x
                   << ", y=" << goal_y <<", yaw=" << goal_yaw 
                   << std::endl;
-
-    }    
+        is_goal_initialized= true;
+    }
     std::cout << "Initializing ROS..." << std::endl;
 
     ros::Subscriber poseSub = n.subscribe("current_pose", 1, poseCallback);
-    ros::Subscriber navigationGoalSub = n.subscribe("move_base_simple/goal", 1, goalPoseCallback);
+    ros::Subscriber navigationGoalSub = n.subscribe("goal_pose", 1, goalPoseCallback);
     ros::Subscriber obsMapSub = n.subscribe("obstacle_cost_map", 1, obstacleMapCallback);
     ros::Subscriber obsPoseVelSub = n.subscribe("obstacle_posevel_array", 1, obsPoseVelCallback);
     ros::Publisher pathPub =  n.advertise<nav_msgs::Path>("global_path",10);
@@ -123,8 +125,10 @@ int main(int argc, char **argv){
     DijkstraPlanner solver;
     solver.setStaticMap(global_static_map);
 
+    std::cout << "Waiting for initial Pose and goal Pose to start" << std::endl;
+    
     while(ros::ok()){
-        if (is_pose_initialized){
+        if (is_pose_initialized and is_goal_initialized){
             std::cout << "Current Pose: x " << current_pose.pose.position.x
                       << ", y " << current_pose.pose.position.y
                       << ", theta(rad) " << tf::getYaw(current_pose.pose.orientation) <<std::endl;
@@ -151,7 +155,7 @@ int main(int argc, char **argv){
             std::cout<< "[AnytimePlanning] solving path..." <<std::endl;
             path = solver.findPath();
             std::cout<< "path len: " << path.poses.size() << std::endl;
-            
+
             if(path.poses.size() < 2){
                 std::cout<< "Invalid path! output path need to have at least 2 waypoints" << std::endl;
             }else{

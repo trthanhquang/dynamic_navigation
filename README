@@ -16,8 +16,9 @@ catkin_make
 cd <repo>
 roslaunch robot_and_map.launch
 
-4. Sample code which generates a path and publish is located at <repo>/src/path_planner/path_generator.py
-To run sample path generator: $ rosrun path_planner path_generator.py
+4. To set goal pose for the robot, open another terminal
+rosrun path_planner set_goal.py 10 20 3.14
+where x=10(m), y=20(m), yaw=3.14(rad)
 
 5. Footprint of the robot in meters
 

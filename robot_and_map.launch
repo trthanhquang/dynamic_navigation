@@ -12,16 +12,16 @@
     <node pkg="p2os_urdf" type="p2os_publisher_3at" name="publisher"/>
 
     <!-- 
-
+        OUR path planning and simulator:
     -->
 
     <node name="map_server" pkg="map_server" type="map_server" args="$(find env_description)/maps/maze.yaml">
         <param name="frame_id" value="/map"/>
     </node>
-
     <node name="tf_broadcast" pkg="simulator" type="tf_broadcast.py"/>
     <node name="path_follower" pkg="simulator" type="path_follower.py"/>
     <node name="obstacle_simulator" pkg="simulator" type="obstacle.py"/>
+    <node name="path_planner" pkg="path_planner" type="path_planner_node" output="screen"/>
 
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find simulator)/robot_and_map.rviz"/> 
 </launch>
