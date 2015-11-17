@@ -60,6 +60,7 @@ public:
     vector<Pose2D> computeOrImprovePath();
     void start_planning_node(boost::shared_ptr<ros::NodeHandle> nh);
     vector<Pose2D> searchNextPoses(Pose2D pose, double output_size, double vel, double dt);
+    pii getpii(Pose2D a);
 private:
     ros::Time current_time;
     set<pii> blocked,static_blocked;
@@ -70,7 +71,7 @@ private:
     map<pii ,double> cost_to_goal,rhs;
     priority_queue<pair<pii ,pdd>, vector<pair<pii,pdd> >, adscomp > open_mp;
     set<pii> open,closed,incons;
-    map<pii, vector<Pose2D> > dads;
+    //map<pii, vector<Pose2D> > dads;
     map<pii, Pose2D> open_st,incons_st;
 
     boost::shared_ptr<nav_msgs::OccupancyGrid> obstacles_map;
@@ -87,7 +88,7 @@ vector<Pose2D> AdsPlanner::searchNextPoses(Pose2D cur_pose, double output_size, 
     vector<Pose2D> nexts;
     double ds = vel*dt;
 
-    cout << "current pose: " << cur_pose.x <<", " << cur_pose.y << ", " << cur_pose.theta << endl;
+    //cout << "current pose: " << cur_pose.x <<", " << cur_pose.y << ", " << cur_pose.theta << endl;
     if(output_size>1){
         double dk = (2.0*K_MAX)/(output_size-1);
         for(int i=0;i<output_size;i++){
@@ -110,8 +111,9 @@ vector<Pose2D> AdsPlanner::searchNextPoses(Pose2D cur_pose, double output_size, 
             next.y = cur_pose.y + dy;
             next.theta = new_theta;
 
-            cout << "next pose: " << next.x <<", " << next.y << ", " << next.theta << endl;
+            //cout << "next pose: " << next.x <<", " << next.y << ", " << next.theta << endl;
             nexts.push_back(next);
+	    //this->dads[mp(cur_pose.x,cur_pose.y)].pb(next);
         }
     }
 
@@ -151,7 +153,7 @@ void AdsPlanner::setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> static_
             {
                 for(int a=max(0,xi-4);a<min(height,xi+5);a++)
                     for(int b=max(0,yi-4);b<min(width,yi+5);b++)
-                        this->static_blocked.insert(std::make_pair(a,b));
+                        this->static_blocked.insert(mp(a,b));
             }
 }
 
@@ -169,7 +171,7 @@ void AdsPlanner::setObstacleList(boost::shared_ptr<path_planner::PoseVelArray> o
 void AdsPlanner::setObstacleMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_grid){
     int width = obs_grid->info.width;
     int height = obs_grid->info.height;
-
+    this->blocked = this->static_blocked;
     this->is_obstacle_present = false;
     for(int yi=0; yi<width; yi++)
         for(int xi=0; xi<height; xi++)
@@ -179,20 +181,21 @@ void AdsPlanner::setObstacleMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_g
                 this->is_obstacle_present = true;
                 for(int a=max(0,xi-4);a<min(height,xi+5);a++)
                     for(int b=max(0,yi-4);b<min(width,yi+5);b++)
-                        this->blocked.insert(std::make_pair(a,b));
+                        this->blocked.insert(mp(a,b));
             }
 }
 
 
 
 pdd AdsPlanner::key(Pose2D state){
-        if(this->blocked.find(mp(state.x,state.y))!=this->blocked.end()){
+	pii state2d = getpii(state);
+        if(this->blocked.find(state2d)!=this->blocked.end()){
                 cout<<"key for blocked state accessed"<<endl;
                 return mp(0.1*DBL_MAX,0.1*DBL_MAX);
         }
         Pose2D initial_position = this->initial_position;
         double h_cost = max(abs(initial_position.x-state.x),abs(initial_position.y-state.y));
-        pii state2d = mp(state.x,state.y);
+       // pii state2d = getpii(state);
         if(cost_to_goal[state2d]>rhs[state2d])
                 return mp(this->rhs[state2d] + this->epsilon * h_cost,rhs[state2d]);
         else 
@@ -201,26 +204,27 @@ pdd AdsPlanner::key(Pose2D state){
 
 void  AdsPlanner::updateState(Pose2D state){
         set<pii> blocked = this->blocked;
+	pii state2d = getpii(state);
         pii xrange = this->xrange, yrange = this->yrange;
-        if(cost_to_goal.find(mp(state.x,state.y))!=cost_to_goal.end())
-                cost_to_goal[mp(state.x,state.y)] = 0.1*DBL_MAX;
+        if(cost_to_goal.find(state2d)!=cost_to_goal.end())
+                cost_to_goal[state2d] = 0.1*DBL_MAX;
         if(state.x != this->terminus.x || state.y != this->terminus.y){
                 vector<Pose2D> successors = searchNextPoses(state, 5, 2, 1.5);
                 double minh = 0.1*DBL_MAX;
                 for(vector<Pose2D>::iterator it = successors.begin();it!=successors.end();it++){
-                        pii nxt = mp((*it).x, (*it).y);
+                        pii nxt = getpii(*it);
                         double dx = abs(state.x-(*it).x), dy = abs(state.y-(*it).y);
                         double cost = sqrt(dx*dx+dy*dy);
                         if (blocked.find(nxt) != blocked.end() || nxt.first < xrange.first || nxt.first > xrange.second || nxt.second < yrange.first || nxt.second > yrange.second)continue;
 
-                        this->dads[nxt].pb(state);
+                        //this->dads[nxt].pb(state);
                         if(minh > cost_to_goal[nxt] + cost)
                                 minh = cost_to_goal[nxt] + cost;
                 }
-                this->rhs[mp(state.x,state.y)] = minh;
+                this->rhs[state2d] = minh;
                 if(minh>=0.1*DBL_MAX) cout<<"blocked state inserted"<<endl;
                 }
-        if(this->open.erase(mp(state.x,state.y))){
+        if(this->open.erase(state2d)){
         //this->open_st.erase(mp(state.x,state.y));
         priority_queue<pair<pii ,pdd>, vector<pair<pii,pdd> >, adscomp > tmp;
         while(!this->open_mp.empty()){
@@ -231,18 +235,18 @@ void  AdsPlanner::updateState(Pose2D state){
         }
         this->open_mp=tmp;
         }
-        if(blocked.find(mp(state.x,state.y))!=blocked.end()){
-                cost_to_goal[mp(state.x,state.y)] = 0.1 * DBL_MAX;
-                rhs[mp(state.x,state.y)] = 0.1 * DBL_MAX;
+        if(blocked.find(state2d)!=blocked.end()){
+                cost_to_goal[state2d] = 0.1 * DBL_MAX;
+                rhs[state2d] = 0.1 * DBL_MAX;
 }               
         if(cost_to_goal[mp(state.x,state.y)]!=rhs[mp(state.x,state.y)]){
-                if(closed.find(mp(state.x,state.y))==closed.end()){
-                        this->open_mp.push(mp(mp(state.x,state.y),key(state)));
-                        this->open.insert(mp(state.x,state.y));
-                        this->open_st[mp(state.x,state.y)] = state;
+                if(closed.find(state2d)==closed.end()){
+                        this->open_mp.push(mp(state2d,key(state)));
+                        this->open.insert(state2d);
+                        this->open_st[state2d] = state;
                 }else{
-                        this->incons.insert(mp(state.x,state.y));
-                        this->incons_st[mp(state.x,state.y)] = state;
+                        this->incons.insert(state2d);
+                        this->incons_st[state2d] = state;
                 //      incons_mp.push(mp(state,key(state)));
                 }
         }
@@ -257,28 +261,38 @@ Pose2D AdsPlanner::makep2d(pii a){
 return tmp;
 }
 
+pii AdsPlanner::getpii(Pose2D a){
+	return mp(int(a.x),int(a.y));
+}
+
 vector<Pose2D>  AdsPlanner::computeOrImprovePath(){
         vector<Pose2D> path;
-        pii iposn = mp(this->initial_position.x,this->initial_position.y);
-        while(lexcomp(this->open_mp.top(),mp(iposn,key(this->initial_position))) || this->rhs[iposn]!=this->cost_to_goal[iposn]){
+        pii iposn = getpii(this->initial_position);cout<<"a";
+        while(ros::ok() && !this->open.empty() && (lexcomp(this->open_mp.top(),mp(iposn,key(this->initial_position))) || this->rhs[iposn]!=this->cost_to_goal[iposn])){
         pair<pii, pdd> sx = this->open_mp.top();
-        pii s = sx.first;       
+        pii s = sx.first;cout<<"b";       
         path.pb(this->open_st[s]);
         this->open_mp.pop();
         this->open.erase(s);
+	vector<Pose2D> dads = searchNextPoses(this->open_st[s], 5, -2, 1.5);
         if(this->cost_to_goal[s] > this->rhs[s]){
                 this->cost_to_goal[s] = this->rhs[s];
-                this->closed.insert(s);
-                for(vector<Pose2D>::iterator it=this->dads[s].begin();it!=this->dads[s].end();it++)
+                this->closed.insert(s);cout<<"c";
+               /* for(vector<Pose2D>::iterator it=this->dads[s].begin();it!=this->dads[s].end();it++)
                         updateState(*it);
                 }else{
                 this->cost_to_goal[s] = 0.1 * DBL_MAX;
-                for(vector<Pose2D>::iterator it=dads[s].begin();it!=dads[s].end();it++)
+                for(vector<Pose2D>::iterator it=this->dads[s].begin();it!=this->dads[s].end();it++)*/
+			for(vector<Pose2D>::iterator it=dads.begin();it!=dads.end();it++)
                         updateState(*it);
-                updateState(open_st[s]);
-                }
+                }else{
+                this->cost_to_goal[s] = 0.1 * DBL_MAX;
+                for(vector<Pose2D>::iterator it=dads.begin();it!=dads.end();it++)
+                        updateState(*it);
+                updateState(this->open_st[s]);
+                }cout<<"d";
         //this->open_st.erase(s);
-        }       
+        }cout<<"e"<<endl;       
         return path;
 }
 
@@ -286,10 +300,11 @@ vector<Pose2D>  AdsPlanner::computeOrImprovePath(){
 void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh){
     Pose2D initial_position = this->initial_position;
     terminus = this->terminus;
-    this->cost_to_goal[mp(initial_position.x,initial_position.y)] = 0.1 * DBL_MAX;
-    this->rhs[mp(initial_position.x,initial_position.y)] = 0.1 *  DBL_MAX;
-    this->cost_to_goal[mp(terminus.x,terminus.y)] = 0.1 *  DBL_MAX;
-    this->rhs[mp(terminus.x,terminus.y)] = 0;
+    pii iposn = getpii(initial_position), tposn = getpii(terminus);
+    this->cost_to_goal[iposn] = 0.1 * DBL_MAX;
+    this->rhs[iposn] = 0.1 *  DBL_MAX;
+    this->cost_to_goal[tposn] = 0.1 *  DBL_MAX;
+    this->rhs[tposn] = 0;
     this->epsilon = 2.5;
     this->open_mp = priority_queue<pair<pii ,pdd>, vector<pair<pii,pdd> >, adscomp >();
     //      this->closed_mp = priority_queue<pair<pii, pdd> >();
@@ -300,9 +315,9 @@ void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh){
     this->open_st = map<pii, Pose2D>();
     this->incons_st = map<pii, Pose2D>();
 
-    this->open_mp.push(mp(mp(terminus.x,terminus.y), key(terminus)));
-    this->open.insert(mp(terminus.x,terminus.y));
-    this->open_st[mp(terminus.x,terminus.y)] = terminus;
+    this->open_mp.push(mp(tposn, key(terminus)));
+    this->open.insert(tposn);
+    this->open_st[tposn] = terminus;
 
     vector<Pose2D> path = computeOrImprovePath();
     
@@ -370,113 +385,4 @@ void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh){
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*nav_msgs::Path DijkstraPlanner::findPath(){
-    //declarations
-    priority_queue<pi3, vector<pi3>, greater<pi3> > Q;
-    map<pii, int> dist;
-    map<pii, pii> dad;
- 
-    pii initial_position=this->initial_position,terminus=this->terminus,xrange=this->xrange,yrange=this->yrange;
-    set<pii>blocked =this->blocked;
-    //initializations
-    Q.push(mp(0, initial_position));
-    dist[initial_position] = 0;
-
-    //Djikstra
-    while (!Q.empty()) {
-        pi3 p = Q.top();
-        if ((p.second).first == terminus.first && (p.second).second == terminus.second) break;
-        Q.pop();
-
-        pii here = p.second;
-        for (int i = 1; i < 9; i++) {
-            int dx = (i - (i % 3)) / 3, dy = i % 3;
-            pii nxt = mp((here.first) + 1 - dx, (here.second) + 1 - dy);
-            if (blocked.find(nxt) != blocked.end() || nxt.first < xrange.first || nxt.first > xrange.second || nxt.second < yrange.first || nxt.second > yrange.second)continue;
-
-            if (dist.find(nxt) == dist.end() || dist[here] + 1 < dist[nxt]) {
-                dist[nxt] = dist[here] + 1;
-                dad[nxt] = here;
-                Q.push(mp(dist[nxt], nxt));
-            }
-
-        }
-    }
-   
-    vector<vector<double> > path_plan;
-    vector<double> tpose;
-    tpose.pb(terminus.first);
-    tpose.pb(terminus.second);
-    tpose.pb(this->ty);
-    path_plan.pb(tpose);
-
-    double new_yaw;
-    double yaws[9]={0,M_PI/2,3*M_PI/2,0,M_PI/4,7*M_PI/4,M_PI,3*M_PI/4,5*M_PI/4};
-    if (dist.find(terminus) != dist.end())
-        for (pii i = terminus; dad.find(i) != dad.end(); i = dad[i]){
-        vector<double> new_pose,pose=path_plan.back();
-        new_yaw=yaws[int(3*(abs(pose[0]-i.first)+(pose[0]<i.first))+abs(pose[1]-i.second)+(pose[1]<i.second))];
-        if(new_yaw!=pose[2]){
-            vector<double> new_pose_turn;
-            new_pose_turn.pb(pose[0]);
-                    new_pose_turn.pb(pose[1]);
-                    new_pose_turn.pb(new_yaw);
-            path_plan.pb(new_pose_turn);
-        }
-        new_pose.pb(i.first);
-        new_pose.pb(i.second);
-        new_pose.pb(new_yaw);
-        path_plan.pb(new_pose);
-    }
-    vector<geometry_msgs::PoseStamped> path_points;
-    double ts=0;
-    for(vector<vector<double> >::reverse_iterator it=path_plan.rbegin();it!=path_plan.rend();it++){
-        geometry_msgs::PoseStamped current_pose;
-        current_pose.header.stamp = current_time+ros::Duration(ts);ts+=0.2;
-        string frame = "/map";
-        current_pose.header.frame_id = frame.c_str();
-        vector<double> point3=*it;
-
-        current_pose.pose.position.x=point3[0]*GRID_RESOLUTION;
-        current_pose.pose.position.y=point3[1]*GRID_RESOLUTION;
-
-        geometry_msgs::Quaternion yawor=tf::createQuaternionMsgFromYaw(point3[2]);;
-        //tf.quaternionTFToMsg(qtn,yawor);
-        current_pose.pose.orientation = yawor;
-        path_points.pb(current_pose);
-    }
-
-    nav_msgs::Path path_final;
-    path_final.poses.resize(path_points.size());
-    path_final.header.frame_id = path_points[0].header.frame_id;
-    path_final.header.stamp = path_points[0].header.stamp;
-
-    for(int i =0;i < path_points.size();i++)
-        path_final.poses[i]=path_points[i];
-
-    return path_final;
-}
-*/
 #endif
