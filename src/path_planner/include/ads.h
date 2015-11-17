@@ -35,18 +35,12 @@ typedef pair<int, int> pii;
 typedef pair<double, double> pdd;
 typedef pair<int, pii> pi3;
 
-/*struct Pose2D{
-    double x;
-    double y;
-    double theta;
-};*/
-
 class adscomp{
-	public:
-	bool operator() (const pair<pii ,pdd>& a,const pair<pii ,pdd>& b) const{
-		if(a.second.first == b.second.first) return a.second.second < b.second.second;
-		else return a.second.first < b.second.first;
-	}
+    public:
+    bool operator() (const pair<pii ,pdd>& a,const pair<pii ,pdd>& b) const{
+            if(a.second.first == b.second.first) return a.second.second < b.second.second;
+            else return a.second.first < b.second.first;
+    }
 };
 
 class AdsPlanner{
@@ -57,17 +51,15 @@ public:
     void setCurrentPose(Pose2D current_pose);
     void setGoalPose(Pose2D goal_pose);
     void setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> occup_grid);
-    //int setObstacleMap(boost::shared_ptr<nav_msgs::OccupancyGrid> occup_grid);
-    int setObstacleMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_grid);
+    void setObstacleMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_grid);
     void setObstacleList(boost::shared_ptr<path_planner::PoseVelArray> obs_list);
    // nav_msgs::Path findPath(void);
     pdd key(Pose2D state);
     void updateState(Pose2D state);
     Pose2D makep2d(pii a);
     vector<Pose2D> computeOrImprovePath();
-    void findPath(void);
+    void start_planning_node(boost::shared_ptr<ros::NodeHandle> nh);
     vector<Pose2D> searchNextPoses(Pose2D pose, double output_size, double vel, double dt);
-
 private:
     ros::Time current_time;
     set<pii> blocked,static_blocked;
@@ -80,6 +72,9 @@ private:
     set<pii> open,closed,incons;
     map<pii, vector<Pose2D> > dads;
     map<pii, Pose2D> open_st,incons_st;
+
+    boost::shared_ptr<nav_msgs::OccupancyGrid> obstacles_map;
+    bool is_obstacle_present;
 };
 
 bool lexcomp ( pair<pii ,pdd> a,pair<pii ,pdd> b){
@@ -170,223 +165,210 @@ void AdsPlanner::setObstacleList(boost::shared_ptr<path_planner::PoseVelArray> o
                   << ", vel=" << obs_list->data[i].vel << std::endl;
     }
 }
-/*
-int AdsPlanner::setObstacleMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_grid){
-	//std::cout << "Detect Obstacles: " << obs_list->data.size() << std::endl;
-	this->blocked = this->static_blocked;
-	double obs_rad = 5;//this->obs_rad;
-	
-    for(int i=0; i<obs_list->data.size(); i++){
-	double xi =  data[i].pose.position.x, yi = data[i].pose.position.y;
-                  for(int a=max(0,xi-obs_rad);a<min(yrange.second,xi+obs_rad);a++)
-                     for(int b=max(0,yi-obs_rad);b<min(xrange.second,yi+obs_rad);b++)
-                        if(sqrt(a*a+b*b)<=obs_rad)
-			this->blocked.insert(mp(a,b));
-    }
-    return obs_list->data.size();
-}*/
 
+void AdsPlanner::setObstacleMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_grid){
+    int width = obs_grid->info.width;
+    int height = obs_grid->info.height;
 
- int AdsPlanner::setObstacleMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_grid){
-
-int width = obs_grid->info.width;
-     int height = obs_grid->info.height;
- 
-     //this->xrange=mp(1,width);
-    // this->yrange=mp(1,height);
- 
-     for(int yi=0; yi<width; yi++)
-         for(int xi=0; xi<height; xi++)
+    this->is_obstacle_present = false;
+    for(int yi=0; yi<width; yi++)
+        for(int xi=0; xi<height; xi++)
             if(obs_grid->data[xi+yi*width] > 0)
-             {
-                 for(int a=max(0,xi-4);a<min(height,xi+5);a++)
-                     for(int b=max(0,yi-4);b<min(width,yi+5);b++)
-                         this->blocked.insert(std::make_pair(a,b));
-             }
-
-
-
+            {
+                //just replan if there is a obstacle
+                this->is_obstacle_present = true;
+                for(int a=max(0,xi-4);a<min(height,xi+5);a++)
+                    for(int b=max(0,yi-4);b<min(width,yi+5);b++)
+                        this->blocked.insert(std::make_pair(a,b));
+            }
 }
 
 
 
 pdd AdsPlanner::key(Pose2D state){
-	if(this->blocked.find(mp(state.x,state.y))!=this->blocked.end()){
-		cout<<"key for blocked state accessed"<<endl;
-		return mp(0.1*DBL_MAX,0.1*DBL_MAX);
-	}
-	Pose2D initial_position = this->initial_position;
-	double h_cost = max(abs(initial_position.x-state.x),abs(initial_position.y-state.y));
-	pii state2d = mp(state.x,state.y);
-	if(cost_to_goal[state2d]>rhs[state2d])
-		return mp(this->rhs[state2d] + this->epsilon * h_cost,rhs[state2d]);
-	else 
-		return mp(this->cost_to_goal[state2d] +  h_cost,cost_to_goal[state2d]);
+        if(this->blocked.find(mp(state.x,state.y))!=this->blocked.end()){
+                cout<<"key for blocked state accessed"<<endl;
+                return mp(0.1*DBL_MAX,0.1*DBL_MAX);
+        }
+        Pose2D initial_position = this->initial_position;
+        double h_cost = max(abs(initial_position.x-state.x),abs(initial_position.y-state.y));
+        pii state2d = mp(state.x,state.y);
+        if(cost_to_goal[state2d]>rhs[state2d])
+                return mp(this->rhs[state2d] + this->epsilon * h_cost,rhs[state2d]);
+        else 
+                return mp(this->cost_to_goal[state2d] +  h_cost,cost_to_goal[state2d]);
 }
 
 void  AdsPlanner::updateState(Pose2D state){
-	set<pii> blocked = this->blocked;
-	pii xrange = this->xrange, yrange = this->yrange;
-	if(cost_to_goal.find(mp(state.x,state.y))!=cost_to_goal.end())
-		cost_to_goal[mp(state.x,state.y)] = 0.1*DBL_MAX;
-	if(state.x != this->terminus.x || state.y != this->terminus.y){
-		vector<Pose2D> successors = searchNextPoses(state, 5, 2, 1.5);
-		double minh = 0.1*DBL_MAX;
-		for(vector<Pose2D>::iterator it = successors.begin();it!=successors.end();it++){
-			pii nxt = mp((*it).x, (*it).y);
-			double dx = abs(state.x-(*it).x), dy = abs(state.y-(*it).y);
-			double cost = sqrt(dx*dx+dy*dy);
-			if (blocked.find(nxt) != blocked.end() || nxt.first < xrange.first || nxt.first > xrange.second || nxt.second < yrange.first || nxt.second > yrange.second)continue;
+        set<pii> blocked = this->blocked;
+        pii xrange = this->xrange, yrange = this->yrange;
+        if(cost_to_goal.find(mp(state.x,state.y))!=cost_to_goal.end())
+                cost_to_goal[mp(state.x,state.y)] = 0.1*DBL_MAX;
+        if(state.x != this->terminus.x || state.y != this->terminus.y){
+                vector<Pose2D> successors = searchNextPoses(state, 5, 2, 1.5);
+                double minh = 0.1*DBL_MAX;
+                for(vector<Pose2D>::iterator it = successors.begin();it!=successors.end();it++){
+                        pii nxt = mp((*it).x, (*it).y);
+                        double dx = abs(state.x-(*it).x), dy = abs(state.y-(*it).y);
+                        double cost = sqrt(dx*dx+dy*dy);
+                        if (blocked.find(nxt) != blocked.end() || nxt.first < xrange.first || nxt.first > xrange.second || nxt.second < yrange.first || nxt.second > yrange.second)continue;
 
-			this->dads[nxt].pb(state);
-			if(minh > cost_to_goal[nxt] + cost)
-				minh = cost_to_goal[nxt] + cost;
-		}
-		this->rhs[mp(state.x,state.y)] = minh;
-		if(minh>=0.1*DBL_MAX) cout<<"blocked state inserted"<<endl;
-		}
-	if(this->open.erase(mp(state.x,state.y))){
-	//this->open_st.erase(mp(state.x,state.y));
-	priority_queue<pair<pii ,pdd>, vector<pair<pii,pdd> >, adscomp > tmp;
-	while(!this->open_mp.empty()){
-		pair<pii, pdd> tmpnode = this->open_mp.top();
-		this->open_mp.pop();
-		pii cnode = tmpnode.first;
-		if(state.x!=cnode.first || state.y!=cnode.second) tmp.push(tmpnode);
-	}
-	this->open_mp=tmp;
-	}
-	if(blocked.find(mp(state.x,state.y))!=blocked.end()){
-		cost_to_goal[mp(state.x,state.y)] = 0.1 * DBL_MAX;
-		rhs[mp(state.x,state.y)] = 0.1 * DBL_MAX;
-}		
-	if(cost_to_goal[mp(state.x,state.y)]!=rhs[mp(state.x,state.y)]){
-		if(closed.find(mp(state.x,state.y))==closed.end()){
-			this->open_mp.push(mp(mp(state.x,state.y),key(state)));
-			this->open.insert(mp(state.x,state.y));
-			this->open_st[mp(state.x,state.y)] = state;
-		}else{
-			this->incons.insert(mp(state.x,state.y));
-			this->incons_st[mp(state.x,state.y)] = state;
-		//	incons_mp.push(mp(state,key(state)));
-		}
-	}
+                        this->dads[nxt].pb(state);
+                        if(minh > cost_to_goal[nxt] + cost)
+                                minh = cost_to_goal[nxt] + cost;
+                }
+                this->rhs[mp(state.x,state.y)] = minh;
+                if(minh>=0.1*DBL_MAX) cout<<"blocked state inserted"<<endl;
+                }
+        if(this->open.erase(mp(state.x,state.y))){
+        //this->open_st.erase(mp(state.x,state.y));
+        priority_queue<pair<pii ,pdd>, vector<pair<pii,pdd> >, adscomp > tmp;
+        while(!this->open_mp.empty()){
+                pair<pii, pdd> tmpnode = this->open_mp.top();
+                this->open_mp.pop();
+                pii cnode = tmpnode.first;
+                if(state.x!=cnode.first || state.y!=cnode.second) tmp.push(tmpnode);
+        }
+        this->open_mp=tmp;
+        }
+        if(blocked.find(mp(state.x,state.y))!=blocked.end()){
+                cost_to_goal[mp(state.x,state.y)] = 0.1 * DBL_MAX;
+                rhs[mp(state.x,state.y)] = 0.1 * DBL_MAX;
+}               
+        if(cost_to_goal[mp(state.x,state.y)]!=rhs[mp(state.x,state.y)]){
+                if(closed.find(mp(state.x,state.y))==closed.end()){
+                        this->open_mp.push(mp(mp(state.x,state.y),key(state)));
+                        this->open.insert(mp(state.x,state.y));
+                        this->open_st[mp(state.x,state.y)] = state;
+                }else{
+                        this->incons.insert(mp(state.x,state.y));
+                        this->incons_st[mp(state.x,state.y)] = state;
+                //      incons_mp.push(mp(state,key(state)));
+                }
+        }
 }
 
 
 Pose2D AdsPlanner::makep2d(pii a){
  Pose2D tmp;
-	tmp.x = a.first;
-	tmp.y = a.second;
-	tmp.theta = 0;
+        tmp.x = a.first;
+        tmp.y = a.second;
+        tmp.theta = 0;
 return tmp;
 }
 
 vector<Pose2D>  AdsPlanner::computeOrImprovePath(){
-	vector<Pose2D> path;
-	pii iposn = mp(this->initial_position.x,this->initial_position.y);
-	while(lexcomp(this->open_mp.top(),mp(iposn,key(this->initial_position))) || this->rhs[iposn]!=this->cost_to_goal[iposn]){
-	pair<pii, pdd> sx = this->open_mp.top();
-	pii s = sx.first;	
-	path.pb(this->open_st[s]);
-	this->open_mp.pop();
-	this->open.erase(s);
-	if(this->cost_to_goal[s] > this->rhs[s]){
-		this->cost_to_goal[s] = this->rhs[s];
-		this->closed.insert(s);
-		for(vector<Pose2D>::iterator it=this->dads[s].begin();it!=this->dads[s].end();it++)
-			updateState(*it);
-		}else{
-		this->cost_to_goal[s] = 0.1 * DBL_MAX;
-		for(vector<Pose2D>::iterator it=dads[s].begin();it!=dads[s].end();it++)
+        vector<Pose2D> path;
+        pii iposn = mp(this->initial_position.x,this->initial_position.y);
+        while(lexcomp(this->open_mp.top(),mp(iposn,key(this->initial_position))) || this->rhs[iposn]!=this->cost_to_goal[iposn]){
+        pair<pii, pdd> sx = this->open_mp.top();
+        pii s = sx.first;       
+        path.pb(this->open_st[s]);
+        this->open_mp.pop();
+        this->open.erase(s);
+        if(this->cost_to_goal[s] > this->rhs[s]){
+                this->cost_to_goal[s] = this->rhs[s];
+                this->closed.insert(s);
+                for(vector<Pose2D>::iterator it=this->dads[s].begin();it!=this->dads[s].end();it++)
                         updateState(*it);
-		updateState(open_st[s]);
-		}
-	//this->open_st.erase(s);
-	}	
-	return path;
+                }else{
+                this->cost_to_goal[s] = 0.1 * DBL_MAX;
+                for(vector<Pose2D>::iterator it=dads[s].begin();it!=dads[s].end();it++)
+                        updateState(*it);
+                updateState(open_st[s]);
+                }
+        //this->open_st.erase(s);
+        }       
+        return path;
 }
 
 
-void AdsPlanner::findPath(){
-	Pose2D initial_position = this->initial_position;
-	terminus = this->terminus;
-	this->cost_to_goal[mp(initial_position.x,initial_position.y)] = 0.1 * DBL_MAX;
-	this->rhs[mp(initial_position.x,initial_position.y)] = 0.1 *  DBL_MAX;
-	this->cost_to_goal[mp(terminus.x,terminus.y)] = 0.1 *  DBL_MAX;
-	this->rhs[mp(terminus.x,terminus.y)] = 0;
-	this->epsilon = 2.5;
-	this->open_mp = priority_queue<pair<pii ,pdd>, vector<pair<pii,pdd> >, adscomp >();
-//	this->closed_mp = priority_queue<pair<pii, pdd> >();
-//	this->incons_mp = priority_queue<pair<pii, pdd> >();
-	this->open = set<pii>();
-	this->closed = set<pii>();
-	this->incons = set<pii>();
-	this->open_st = map<pii, Pose2D>();
-	this->incons_st = map<pii, Pose2D>();
-	
-	this->open_mp.push(mp(terminus, key(terminus)));
-	this->open.insert(mp(terminus.x,terminus.y));
-	this->open_st[mp(terminus.x,terminus.y)] = terminus;
-	
-	vector<Pose2D> path = computeOrImprovePath();
-	
-	
+void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh){
+    Pose2D initial_position = this->initial_position;
+    terminus = this->terminus;
+    this->cost_to_goal[mp(initial_position.x,initial_position.y)] = 0.1 * DBL_MAX;
+    this->rhs[mp(initial_position.x,initial_position.y)] = 0.1 *  DBL_MAX;
+    this->cost_to_goal[mp(terminus.x,terminus.y)] = 0.1 *  DBL_MAX;
+    this->rhs[mp(terminus.x,terminus.y)] = 0;
+    this->epsilon = 2.5;
+    this->open_mp = priority_queue<pair<pii ,pdd>, vector<pair<pii,pdd> >, adscomp >();
+    //      this->closed_mp = priority_queue<pair<pii, pdd> >();
+    //      this->incons_mp = priority_queue<pair<pii, pdd> >();
+    this->open = set<pii>();
+    this->closed = set<pii>();
+    this->incons = set<pii>();
+    this->open_st = map<pii, Pose2D>();
+    this->incons_st = map<pii, Pose2D>();
 
+    this->open_mp.push(mp(mp(terminus.x,terminus.y), key(terminus)));
+    this->open.insert(mp(terminus.x,terminus.y));
+    this->open_st[mp(terminus.x,terminus.y)] = terminus;
 
-	bool change1=0;
+    vector<Pose2D> path = computeOrImprovePath();
+    
+    ros::Publisher current_pose_pub = nh->advertise<geometry_msgs::PoseStamped>("current_pose",1);
+    ros::Subscriber obs_sub = nh->subscribe("obstacle_cost_map", 1, &AdsPlanner::setObstacleMap, this);
 
-	while(terminus.x!=initial_position.x || terminus.y!=initial_position.y){
-		set<pii> changed_locs;
+    bool change1=0;
 
-		//publish
+    while(ros::ok() & (terminus.x!=initial_position.x || terminus.y!=initial_position.y)){
+        set<pii> changed_locs;
 
-		//update inital position
-		this->initial_position = path.back();
-		path.pop_back();
-		initial_position = this->initial_position;
+        //publish
 
-		ros::NodeHandle n;
-		ros::Publisher path_pub = n.advertise<Pose2D>("global_path",1000);
-		path_pub.publish(this->initial_position);
+        //update inital position
+        this->initial_position = path.back();
+        path.pop_back();
+        initial_position = this->initial_position;
 
+        geometry_msgs::PoseStamped ps;
+        ps.header.stamp = ros::Time::now();
+        ps.pose.position.x = initial_position.x;
+        ps.pose.position.y = initial_position.y;
+        ps.pose.orientation = tf::createQuaternionMsgFromYaw(initial_position.theta);
+        current_pose_pub.publish(ps);
 
-		set<pii> obsmap = this->blocked;
-		bool change2 = setObstacleMap()>0;
-	if(change1 || change2 || epsilon>1){
-	
-	if((!change1) && change2) this->epsilon = 2.5;
+        set<pii> obsmap = this->blocked;
+        
+        bool change2 = this->is_obstacle_present;
 
-	    if(change1||change2){		
-		for(set<pii>::iterator it=obsmap.begin();it!=obsmap.end();it++)
-		if(this->blocked.find(*it)==this->blocked.end())
-		changed_locs.insert(*it);
-		for(set<pii>::iterator it=this->blocked.begin();it!=this->blocked.end();it++)
-                if(this->obsmap.find(*it)==this->obsmap.end())
-                changed_locs.insert(*it);
-		}
-	change1 = change2;
+        if(change1 || change2 || epsilon>1){
+            if((!change1) && change2)
+                this->epsilon = 2.5;
 
-	   for(set<pii>::iterator it=changed_locs.begin();it!=changed_locs.end();it++)
-		updateState(makep2d(*it));
-	   if(this->epsilon>1) this->epsilon-=0.1;
-	
-	priority_queue<pair<pii ,pdd>, vector<pair<pii,pdd> >, adscomp > tmp;
-		//while(!this->incons.empty()){
-		for(set<pii>::iterator it = this->incons.begin(); it!=this->incons.end(); it++){
-			this->open.insert(*it);
-			this->open_st[*it]=this->incons_st[*it];				
-		}
-		this->incons.clear();
-		for(set<pii>::iterator it = this->open.begin(); it!=this->open.end(); it++){
-                        tmp.push(mp(*it,key(open_st[*it])));
-                }
-		this->open_mp = tmp;
-		this->closed = set<pii>();
+            if(change1||change2)
+            {               
+                for(set<pii>::iterator it=obsmap.begin();it!=obsmap.end();it++)
+                    if(this->blocked.find(*it)==this->blocked.end())
+                        changed_locs.insert(*it);
+                for(set<pii>::iterator it=this->blocked.begin();it!=this->blocked.end();it++)
+                    if(obsmap.find(*it)==obsmap.end())
+                    changed_locs.insert(*it);
+            }
 
- 		path =  computeOrImprovePath();
-	}
-	}
+            change1 = change2;
+
+            for(set<pii>::iterator it=changed_locs.begin();it!=changed_locs.end();it++)
+                updateState(makep2d(*it));
+
+            if(this->epsilon>1) this->epsilon-=0.1;
+    
+            priority_queue<pair<pii ,pdd>, vector<pair<pii,pdd> >, adscomp > tmp;
+            //while(!this->incons.empty()){
+            for(set<pii>::iterator it = this->incons.begin(); it!=this->incons.end(); it++){
+                this->open.insert(*it);
+                this->open_st[*it]=this->incons_st[*it];                                
+            }
+            this->incons.clear();
+            for(set<pii>::iterator it = this->open.begin(); it!=this->open.end(); it++){
+                tmp.push(mp(*it,key(open_st[*it])));
+            }
+            this->open_mp = tmp;
+            this->closed = set<pii>();
+
+            path =  computeOrImprovePath();
+        }
+    }
 }
 
 
