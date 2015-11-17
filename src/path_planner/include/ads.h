@@ -38,8 +38,8 @@ typedef pair<int, pii> pi3;
 class adscomp{
     public:
     bool operator() (const pair<pii ,pdd>& a,const pair<pii ,pdd>& b) const{
-            if(a.second.first == b.second.first) return a.second.second < b.second.second;
-            else return a.second.first < b.second.first;
+            if(a.second.first == b.second.first) return a.second.second > b.second.second;
+            else return a.second.first > b.second.first;
     }
 };
 
@@ -79,8 +79,8 @@ private:
 };
 
 bool lexcomp ( pair<pii ,pdd> a,pair<pii ,pdd> b){
-                if(a.second.first == b.second.first) return a.second.second < b.second.second;
-                else return a.second.first < b.second.first;
+                if(a.second.first == b.second.first) return a.second.second > b.second.second;
+                else return a.second.first > b.second.first;
 }
 
 
@@ -196,18 +196,18 @@ pdd AdsPlanner::key(Pose2D state){
         Pose2D initial_position = this->initial_position;
         double h_cost = max(abs(initial_position.x-state.x),abs(initial_position.y-state.y));
        // pii state2d = getpii(state);
-        if(cost_to_goal[state2d]>rhs[state2d])
-                return mp(this->rhs[state2d] + this->epsilon * h_cost,rhs[state2d]);
+        if(this->cost_to_goal[state2d]>this->rhs[state2d])
+                return mp(this->rhs[state2d] + this->epsilon * h_cost,this->rhs[state2d]);
         else 
-                return mp(this->cost_to_goal[state2d] +  h_cost,cost_to_goal[state2d]);
+                return mp(this->cost_to_goal[state2d] +  h_cost,this->cost_to_goal[state2d]);
 }
 
 void  AdsPlanner::updateState(Pose2D state){
         set<pii> blocked = this->blocked;
 	pii state2d = getpii(state);
         pii xrange = this->xrange, yrange = this->yrange;
-        if(cost_to_goal.find(state2d)!=cost_to_goal.end())
-                cost_to_goal[state2d] = 0.1*DBL_MAX;
+        if(this->cost_to_goal.find(state2d)!=this->cost_to_goal.end())
+                this->cost_to_goal[state2d] = 0.1*DBL_MAX;
         if(state.x != this->terminus.x || state.y != this->terminus.y){
                 vector<Pose2D> successors = searchNextPoses(state, 5, 2, 1.5);
                 double minh = 0.1*DBL_MAX;
@@ -222,7 +222,7 @@ void  AdsPlanner::updateState(Pose2D state){
                                 minh = cost_to_goal[nxt] + cost;
                 }
                 this->rhs[state2d] = minh;
-                if(minh>=0.1*DBL_MAX) cout<<"blocked state inserted"<<endl;
+              //  if(minh>=0.1*DBL_MAX) cout<<"blocked state inserted"<<endl;
                 }
         if(this->open.erase(state2d)){
         //this->open_st.erase(mp(state.x,state.y));
@@ -239,7 +239,7 @@ void  AdsPlanner::updateState(Pose2D state){
                 cost_to_goal[state2d] = 0.1 * DBL_MAX;
                 rhs[state2d] = 0.1 * DBL_MAX;
 }               
-        if(cost_to_goal[mp(state.x,state.y)]!=rhs[mp(state.x,state.y)]){
+        if(cost_to_goal[state2d]!=rhs[state2d]){
                 if(closed.find(state2d)==closed.end()){
                         this->open_mp.push(mp(state2d,key(state)));
                         this->open.insert(state2d);
