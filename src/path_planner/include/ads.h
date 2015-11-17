@@ -204,7 +204,7 @@ pdd AdsPlanner::key(Pose2D state){
 
 void  AdsPlanner::updateState(Pose2D state){
         set<pii> blocked = this->blocked;
-	pii state2d = getpii(state);
+        pii state2d = getpii(state);
         pii xrange = this->xrange, yrange = this->yrange;
         if(this->cost_to_goal.find(state2d)!=this->cost_to_goal.end())
                 this->cost_to_goal[state2d] = 0.1*DBL_MAX;
@@ -238,7 +238,7 @@ void  AdsPlanner::updateState(Pose2D state){
         if(blocked.find(state2d)!=blocked.end()){
                 cost_to_goal[state2d] = 0.1 * DBL_MAX;
                 rhs[state2d] = 0.1 * DBL_MAX;
-}               
+        }               
         if(cost_to_goal[state2d]!=rhs[state2d]){
                 if(closed.find(state2d)==closed.end()){
                         this->open_mp.push(mp(state2d,key(state)));
@@ -266,38 +266,65 @@ pii AdsPlanner::getpii(Pose2D a){
 }
 
 vector<Pose2D>  AdsPlanner::computeOrImprovePath(){
-        vector<Pose2D> path;
-        pii iposn = getpii(this->initial_position);cout<<"a";
-        while(ros::ok() && !this->open.empty() && (lexcomp(this->open_mp.top(),mp(iposn,key(this->initial_position))) || this->rhs[iposn]!=this->cost_to_goal[iposn])){
+    vector<Pose2D> path;
+    pii iposn = getpii(this->initial_position);cout<<"a";
+    while(ros::ok() && !this->open.empty() &&
+        (lexcomp(this->open_mp.top(),mp(iposn,key(this->initial_position))) 
+            || this->rhs[iposn]!=this->cost_to_goal[iposn]) )
+    {
         pair<pii, pdd> sx = this->open_mp.top();
         pii s = sx.first;cout<<"b";       
         path.pb(this->open_st[s]);
         this->open_mp.pop();
         this->open.erase(s);
-	vector<Pose2D> dads = searchNextPoses(this->open_st[s], 5, -2, 1.5);
+        vector<Pose2D> dads = searchNextPoses(this->open_st[s], 5, -2, 1.5);
         if(this->cost_to_goal[s] > this->rhs[s]){
-                this->cost_to_goal[s] = this->rhs[s];
-                this->closed.insert(s);cout<<"c";
-               /* for(vector<Pose2D>::iterator it=this->dads[s].begin();it!=this->dads[s].end();it++)
-                        updateState(*it);
-                }else{
-                this->cost_to_goal[s] = 0.1 * DBL_MAX;
-                for(vector<Pose2D>::iterator it=this->dads[s].begin();it!=this->dads[s].end();it++)*/
-			for(vector<Pose2D>::iterator it=dads.begin();it!=dads.end();it++)
-                        updateState(*it);
-                }else{
-                this->cost_to_goal[s] = 0.1 * DBL_MAX;
-                for(vector<Pose2D>::iterator it=dads.begin();it!=dads.end();it++)
-                        updateState(*it);
-                updateState(this->open_st[s]);
-                }cout<<"d";
+            this->cost_to_goal[s] = this->rhs[s];
+            this->closed.insert(s);cout<<"c";
+           /* for(vector<Pose2D>::iterator it=this->dads[s].begin();it!=this->dads[s].end();it++)
+                    updateState(*it);
+            }else{
+            this->cost_to_goal[s] = 0.1 * DBL_MAX;
+            for(vector<Pose2D>::iterator it=this->dads[s].begin();it!=this->dads[s].end();it++)*/
+            for(vector<Pose2D>::iterator it=dads.begin();it!=dads.end();it++)
+                updateState(*it);
+        }else{
+            this->cost_to_goal[s] = 0.1 * DBL_MAX;
+            for(vector<Pose2D>::iterator it=dads.begin();it!=dads.end();it++)
+                updateState(*it);
+            updateState(this->open_st[s]);
+        }
+        cout<<"d";
         //this->open_st.erase(s);
-        }cout<<"e"<<endl;       
-        return path;
+    }
+    cout<<"e"<<endl;       
+    return path;
 }
 
+nav_msgs::Path pose2d_to_path(vector<Pose2D> v){
+    nav_msgs::Path path;
+    path.header.frame_id = "/map";
+
+    cout << "current path: [";
+    for(vector<Pose2D>::iterator it=v.begin();it!=v.end();it++){
+        geometry_msgs::PoseStamped ps;
+        ps.header.frame_id = "/map";
+        ps.pose.position.x = (*it).x;
+        ps.pose.position.y = (*it).y;
+        ps.pose.orientation = tf::createQuaternionMsgFromYaw(it->theta);
+        path.poses.push_back(ps);
+        cout << "("<< it->x <<", " << it->y <<", "<< it->theta <<") ";
+    }
+    cout << "]"<< endl;
+
+    return path;
+}
 
 void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh){
+    ros::Publisher current_pose_pub = nh->advertise<geometry_msgs::PoseStamped>("current_pose",1);
+    ros::Publisher path_pub = nh->advertise<nav_msgs::Path>("global_path",1);
+    ros::Subscriber obs_sub = nh->subscribe("obstacle_cost_map", 1, &AdsPlanner::setObstacleMap, this);
+    
     Pose2D initial_position = this->initial_position;
     terminus = this->terminus;
     pii iposn = getpii(initial_position), tposn = getpii(terminus);
@@ -320,9 +347,9 @@ void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh){
     this->open_st[tposn] = terminus;
 
     vector<Pose2D> path = computeOrImprovePath();
+    cout << "Path len: " << path.size() << endl;
+    path_pub.publish(pose2d_to_path(path));
     
-    ros::Publisher current_pose_pub = nh->advertise<geometry_msgs::PoseStamped>("current_pose",1);
-    ros::Subscriber obs_sub = nh->subscribe("obstacle_cost_map", 1, &AdsPlanner::setObstacleMap, this);
 
     bool change1=0;
 
