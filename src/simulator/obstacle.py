@@ -2,12 +2,14 @@
 import rospy
 import tf
 import numpy as np
+import math
 
 from visualization_msgs.msg import MarkerArray, Marker
-from geometry_msgs.msg import Pose, PoseStamped
+from geometry_msgs.msg import Pose, PoseStamped, Quaternion
 from nav_msgs.msg import OccupancyGrid
 from nav_msgs.srv import GetMap
 from path_planner.msg import PoseVel, PoseVelArray
+from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
 from sets import Set
 
@@ -16,7 +18,7 @@ obstacles_list = [
         'id': 'obstacle 1',
         't': [0, 1, 13, 14, 26, 27],
         'x': [3, 3, 15, 15,  3,  3],
-        'y': [6, 6,  6,  6,  6,  6]
+        'y': [6, 6,  6,  6,  6,  6],
     },
     {
         'id': 'obstacle 2',
@@ -36,7 +38,7 @@ SENSORS_RADIUS = 6
 current_pose = None
 static_map = None 
 
-def generate_vel_profile():
+def generate_vel_yaw_profile():
     for obstacle in obstacles_list:
         t_profile = np.arange(0, obstacle['t'][-1], 0.1)
         x = np.interp(t_profile, obstacle['t'], obstacle['x'])
@@ -49,8 +51,10 @@ def generate_vel_profile():
 
         v_profile = dxy/dt
         t_profile = t_profile[:-1]
+        yaw_profile = [math.atan2(dyi,dxi) for dxi,dyi in zip(dx,dy)]
 
-        obstacle['v_profile']={ 't':t_profile, 'v':v_profile }
+        obstacle['profile']={ 't':t_profile, 'v':v_profile, 'yaw':yaw_profile }
+
 
 def create_marker(t,x,y, x_size=1, y_size=1, z_size=0.1, m_type=Marker.SPHERE):
     m = Marker()
@@ -116,7 +120,7 @@ if __name__ == '__main__':
     obs_posevel_pub = rospy.Publisher('obstacle_posevel_array',PoseVelArray, queue_size=10)
     pose_sub = rospy.Subscriber('current_pose', PoseStamped , poseCallback)
 
-    generate_vel_profile()
+    generate_vel_yaw_profile()
 
     static_map = get_static_map()
     print static_map.info
@@ -150,11 +154,18 @@ if __name__ == '__main__':
             t = time_passed % obstacle['t'][-1]
             m.pose.position.x = np.interp(t, obstacle['t'], obstacle['x'])
             m.pose.position.y = np.interp(t, obstacle['t'], obstacle['y'])
+
+            yaw = np.interp(t, obstacle['profile']['t'], obstacle['profile']['yaw'])
+            q = quaternion_from_euler(0,0,yaw)
+            m.pose.orientation = Quaternion(*q)
+
             m.pose.orientation.w = 1
             
             ma.markers.append(m)
             
-            v = np.interp(t, obstacle['v_profile']['t'], obstacle['v_profile']['v'])
+            v = np.interp(t, obstacle['profile']['t'], obstacle['profile']['v'])
+
+            # print 'obstacle %s v=%s yaw = %s, quat = %s'%(i,v,yaw,q)
 
             if current_pose!=None:
                 dx = m.pose.position.x - current_pose.pose.position.x
@@ -172,7 +183,7 @@ if __name__ == '__main__':
                         pv = PoseVel()
                         pv.pose.position.x = m.pose.position.x
                         pv.pose.position.y = m.pose.position.y
-                        pv.pose.orientation.w = m.pose.orientation.w
+                        pv.pose.orientation = m.pose.orientation
                         pv.vel = v
                         
                         obs_pv_arrays.data.append(pv)
