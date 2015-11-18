@@ -123,6 +123,9 @@ int main(int argc, char **argv){
     nav_msgs::Path path;
 
     DijkstraReplanner solver;
+
+    ros::Subscriber obs_sub = n.subscribe("obstacle_cost_map", 1, &DijkstraReplanner::setObstacleMap, &solver);
+
     solver.setStaticMap(global_static_map);
 
     std::cout << "Waiting for initial Pose and goal Pose to start" << std::endl;
