@@ -39,7 +39,7 @@ How to run:
 #include "tf/transform_datatypes.h"  //http://docs.ros.org/api/tf/html/c++/transform__datatypes_8h.html
 
 //planner libs
-#include "dijkstra_planner.h"
+#include "dijkstra_replanner.h"
 #include <vector>
 
 bool is_pose_initialized = false;
@@ -122,7 +122,7 @@ int main(int argc, char **argv){
     ros::Rate loop_rate(10);
     nav_msgs::Path path;
 
-    DijkstraPlanner solver;
+    DijkstraReplanner solver;
     solver.setStaticMap(global_static_map);
 
     std::cout << "Waiting for initial Pose and goal Pose to start" << std::endl;
