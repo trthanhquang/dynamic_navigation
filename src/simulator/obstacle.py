@@ -158,8 +158,6 @@ if __name__ == '__main__':
             yaw = np.interp(t, obstacle['profile']['t'], obstacle['profile']['yaw'])
             q = quaternion_from_euler(0,0,yaw)
             m.pose.orientation = Quaternion(*q)
-
-            m.pose.orientation.w = 1
             
             ma.markers.append(m)
             
