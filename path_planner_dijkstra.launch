@@ -1,10 +1,10 @@
 <launch>
     <!--
         ROBOT MODEL: pioneer 3at
-        ORIGINAL LAUNCH FILE: <include file="$(find p2os_urdf)/launch/pioneer3at_urdf.launch"/>
+        ORIGINAL LAUNCH FILE: <include file="$(find p2os_urdf)/launch/pioneer3dx_urdf.launch"/>
         TODO: remove robot frame, only keep stl for visualization
      -->
-    <include file="$(find p2os_urdf)/launch/upload_pioneer3at.xml"/>
+    <include file="$(find p2os_urdf)/launch/upload_pioneer3dx.xml"/>
     <node pkg="robot_state_publisher" type="state_publisher" name="robot_state_publisher">
         <param name="publish_frequency" type="double" value="100.0"/>
         <param name="tf_prefix" type="string" value=""/>
