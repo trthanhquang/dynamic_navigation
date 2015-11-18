@@ -57,7 +57,7 @@ if __name__ == '__main__':
             if len(tL) <= 1:
                 print 'INVALID path length'
                 continue
-            
+            t = tL[1]
             x = np.interp(t,tL,xL)
             y = np.interp(t,tL,yL)
             yaw = np.interp(t,tL,yawL)

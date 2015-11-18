@@ -138,9 +138,15 @@ int main(int argc, char **argv){
             
             Pose2D start_2dpose, goal_2dpose;
 
-            start_2dpose.x = current_pose.pose.position.x;
-            start_2dpose.y = current_pose.pose.position.y;
-            start_2dpose.theta = tf::getYaw(current_pose.pose.orientation);
+            if (path.poses.size() >=2){
+                start_2dpose.x = current_pose.pose.position.x;
+                start_2dpose.y = current_pose.pose.position.y;
+                start_2dpose.theta = tf::getYaw(current_pose.pose.orientation);                
+            }else{
+                start_2dpose.x = path.poses[1].pose.position.x;
+                start_2dpose.y = path.poses[1].pose.position.y;
+                start_2dpose.theta = tf::getYaw(path.poses[1].pose.orientation);
+            }
 
             goal_2dpose.x = goal_x;
             goal_2dpose.y = goal_y;
