@@ -6,6 +6,16 @@ from tf.transformations import quaternion_from_euler
 
 import numpy as np
 
+goal = None
+if len(sys.argv)==4:
+    x = float(sys.argv[1])
+    y = float(sys.argv[2])
+    yaw = float(sys.argv[3])
+    goal = (x,y,yaw)
+else:
+    print 'syntax: python dstar.py x y yaw'
+    sys.exit(1)
+
 rospy.init_node("dstar")
 
 #Init Static Map
@@ -17,12 +27,18 @@ map_height = static_map.info.height
 
 #Subscriber for Obstacle Map
 obs_map = None
+current_pose = None
 def obs_map_callback(msg):
     global obs_map
     obs_map = msg
 
+def poseCallback(msg):
+    global current_pose
+    current_pose = msg
+
 obsSub = rospy.Subscriber("obstacle_cost_map",OccupancyGrid, obs_map_callback)
-pathPub = rospy.Publisher("global_path2", Path, queue_size=10)
+pose_sub = rospy.Subscriber('current_pose', PoseStamped , poseCallback)
+pathPub = rospy.Publisher("global_path", Path, queue_size=10)
 
 #---------------------------------------------------------------
 # GENERAL HELPING FUNCTIONs
@@ -43,9 +59,17 @@ def generate_path_msg(path):
     pathmsg = Path()
     pathmsg.header.frame_id = "map"
 
+    start_t = rospy.Time.now()
+    length = 0
     for x,y,g in path:
         ps = PoseStamped()
         ps.header.frame_id = "map"
+
+        if len(pathmsg.poses)>0:
+            length += ((pathmsg.poses[-1].pose.position.x - x*0.1)**2+
+                (pathmsg.poses[-1].pose.position.y - y*0.1)**2)**0.5
+
+        ps.header.stamp = start_t+rospy.Duration(length/1.6)
         
         position = [x*0.1,y*0.1,0]
         theta = 0
@@ -186,13 +210,17 @@ def computePathFromG():
 #---------------------------------------------------------------
 # MAIN
 
+while current_pose==None:
+    print 'waiting for init pose'
+print 'init pose received'
 
 visited = np.zeros(map_width*map_height)
 g = np.ones(map_width*map_height)*float('inf') #cost to goal
 rhs = np.ones(map_width*map_height)*float('inf') 
 
-start_pos = (20,20)
-goal_pos  = (50,90)
+# start_pos = (20,20)
+start_pos = (current_pose.pose.position.x/0.1,current_pose.pose.position.y/0.1)
+goal_pos  = (goal[0]/0.1, goal[1]/0.1)
 start_s = pos_to_s(start_pos)
 goal_s = pos_to_s(goal_pos)
 
@@ -212,14 +240,14 @@ print 'Path:',path
 msg = generate_path_msg(path)
 pathPub.publish(msg)
 
+
 r = rospy.Rate(10)
 while not rospy.is_shutdown():
     visited = np.zeros(map_width*map_height)
     g = np.ones(map_width*map_height)*float('inf') #cost to goal
     rhs = np.ones(map_width*map_height)*float('inf') 
 
-    start_pos = (20,20)
-    goal_pos  = (50,90)
+    start_pos = (current_pose.pose.position.x/0.1,current_pose.pose.position.y/0.1)
     start_s = pos_to_s(start_pos)
     goal_s = pos_to_s(goal_pos)
 

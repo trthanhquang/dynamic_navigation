@@ -16,19 +16,19 @@ from sets import Set
 obstacles_list = [
     {
         'id': 'obstacle 1',
-        't': [0, 1, 13, 14, 26, 27],
+        't': np.array([0, 1, 13, 14, 26, 27])*2,
         'x': [3, 3, 15, 15,  3,  3],
         'y': [6, 6,  6,  6,  6,  6],
     },
     {
         'id': 'obstacle 2',
-        't': [0, 1,  6,  7, 12, 13],
+        't': np.array([0, 1,  6,  7, 12, 13])*2,
         'x': [1, 1,  6,  6,  1,  1],
         'y': [4, 4,  4,  4,  4,  4]
     },
     {
         'id': 'obstacle 3',
-        't': [ 0, 1,   5,  7, 12, 13],
+        't': np.array([ 0, 1,   5,  7, 12, 13])*2,
         'x': [14, 14, 14, 14, 14, 14],
         'y': [ 8, 8,  15, 15,  8,  8]
     },
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     static_map = get_static_map()
     print static_map.info
 
-    r = rospy.Rate(50)
+    r = rospy.Rate(100)
     tStart = rospy.Time.now().to_sec()
     while not rospy.is_shutdown():
         time_passed = rospy.Time.now().to_sec() - tStart
