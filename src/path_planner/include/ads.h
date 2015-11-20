@@ -172,7 +172,7 @@ void AdsPlanner::setGoalPose(Pose2D goal_pose) {
 void AdsPlanner::setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> static_grid) {
     int width = static_grid->info.width;
     int height = static_grid->info.height;
-
+     cout<<"static" << width<<endl;
     this->xrange = mp(1, width);
     this->yrange = mp(1, height);
 
@@ -183,6 +183,7 @@ void AdsPlanner::setStaticMap(boost::shared_ptr<nav_msgs::OccupancyGrid> static_
                     for (int b = max(0, yi - 4); b < min(width, yi + 5); b++)
                         this->static_blocked.insert(mp(a, b));
             }
+    cout << width << " " <<height << " " << (this->static_blocked.find(mp(111,111))==this->static_blocked.end() )<< " "<< this->static_blocked.size()<< " " <<(*this->static_blocked.rbegin()).first<<endl;
 }
 
 void AdsPlanner::setObstacleList(boost::shared_ptr<path_planner::PoseVelArray> obs_list) {
@@ -200,6 +201,7 @@ void AdsPlanner::setObstacleMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_g
     int width = obs_grid->info.width;
     int height = obs_grid->info.height;
     this->blocked = this->static_blocked;
+cout<<"Before update : " << this->blocked.size()<<endl;
     this->is_obstacle_present = false;
     for (int yi = 0; yi < width; yi++)
         for (int xi = 0; xi < height; xi++)
@@ -210,6 +212,8 @@ void AdsPlanner::setObstacleMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_g
                     for (int b = max(0, yi - 4); b < min(width, yi + 5); b++)
                         this->blocked.insert(mp(a, b));
             }
+
+cout<<"Updated obstacle size " <<this->blocked.size()<<endl;
 }
 
 //////////////////////////////////////////////////
@@ -218,7 +222,7 @@ void AdsPlanner::setObstacleMap(boost::shared_ptr<nav_msgs::OccupancyGrid> obs_g
 
 pdd AdsPlanner::key(Pose2D state) {
     pii state2d = getpii(state);
-
+    Pose2D initial_position = this->initial_position;
     double h_cost = max(abs(initial_position.x - state.x), abs(initial_position.y - state.y));
     if (this->cost_to_goal[state2d]>this->rhs[state2d])
         return mp(this->rhs[state2d] + this->epsilon * h_cost, this->rhs[state2d]);
@@ -229,8 +233,8 @@ pdd AdsPlanner::key(Pose2D state) {
 void AdsPlanner::updateState(Pose2D state) {
     set<pii> blocked = this->blocked;
     pii state2d = getpii(state), tposn = getpii(this->terminus);
-
-    open.erase(state2d);
+    pii xrange = this->xrange, yrange = this->yrange;
+    this->open.erase(state2d);
     if (blocked.find(state2d) != blocked.end() || state2d.first < xrange.first || state2d.first > xrange.second || state2d.second < yrange.first || state2d.second > yrange.second)return;
 
 
@@ -259,7 +263,7 @@ void AdsPlanner::updateState(Pose2D state) {
         //  if(minh>=0.1*DBL_MAX) cout<<"blocked state inserted"<<endl;
     }
     if (this->cost_to_goal[state2d] != this->rhs[state2d]) {
-        if (closed.find(state2d) == closed.end()) {
+        if (this->closed.find(state2d) == this->closed.end()) {
             this->open_mp.push(mp(state2d, key(state)));
             this->open.insert(state2d);
             this->open_st[state2d] = state;
@@ -317,6 +321,7 @@ vector<Pose2D> AdsPlanner::computeOrImprovePath() {
         //this->open_st.erase(s);
     }
     //cout<<"e"<<endl;       
+    path = vector<Pose2D>();
     map<pii, Pose2D> succ_pp = this->succ_pp;
     if (succ_pp.find(iposn) != succ_pp.end()){
         for (Pose2D i = succ_pp[iposn]; succ_pp.find(getpii(i)) != succ_pp.end(); i = succ_pp[getpii(i)])
@@ -379,21 +384,21 @@ void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh) {
     cout << "Path len: " << path.size() << endl;
     path_pub.publish(pose2d_to_path(path));
 
-    bool change1 = 0;
-    int cnt = 0;
 
-    ros::Rate loop_rate(5);
+    bool change1 = 0;
+
     while (ros::ok() && tposn != iposn) {
         set<pii> changed_locs;
 
         //publish
 
         //update inital position
+	if(path.size()){
         this->initial_position = path.front();
         path.erase(path.begin());
         initial_position = this->initial_position;
         iposn = getpii(initial_position);
-
+	}
         geometry_msgs::PoseStamped ps;
         ps.header.stamp = ros::Time::now();
         ps.pose.position.x = initial_position.x;
@@ -401,10 +406,7 @@ void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh) {
         ps.pose.orientation = tf::createQuaternionMsgFromYaw(initial_position.theta);
         current_pose_pub.publish(ps);
 
-        cout << "iteration " << cnt++ 
-            << ", pose: " << initial_position.x 
-            << ", " << initial_position.y 
-            << ", " << initial_position.theta << endl;
+
 
         if (change1 || change2 || epsilon > 1) {
             if ((!change1) && change2)
@@ -434,7 +436,7 @@ void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh) {
             for (set<pii>::iterator it = changed_locs.begin(); it != changed_locs.end(); it++)
                 updateState(makep2d(*it));
 
-            if (this->epsilon > 1) this->epsilon = max(this->epsilon - 1, 1.0);
+            if (this->epsilon > 1) this->epsilon = max(this->epsilon - 0.5, 1.0);
 
             this->open_mp = priority_queue<pair<pii, pdd>, vector<pair<pii, pdd> >, adscomp >();
             //while(!this->incons.empty()){
@@ -451,11 +453,6 @@ void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh) {
             change2 = this->is_obstacle_present;
             path = computeOrImprovePath();
         }
-
-        path_pub.publish(pose2d_to_path(path));
-        ros::spinOnce();
-        loop_rate.sleep();
-
     }
 }
 #endif
