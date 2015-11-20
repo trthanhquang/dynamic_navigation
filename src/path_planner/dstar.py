@@ -1,3 +1,4 @@
+#!/bin/python
 import rospy
 from nav_msgs.srv import * 
 from nav_msgs.msg import Path, OccupancyGrid
@@ -6,14 +7,22 @@ from tf.transformations import quaternion_from_euler
 
 import numpy as np
 
-goal = None
-if len(sys.argv)==4:
+GOAL = None
+INIT = None
+
+if len(sys.argv)==7:
     x = float(sys.argv[1])
     y = float(sys.argv[2])
     yaw = float(sys.argv[3])
-    goal = (x,y,yaw)
+    INIT = (x,y,yaw)
+
+    x = float(sys.argv[4])
+    y = float(sys.argv[5])
+    yaw = float(sys.argv[6])
+    GOAL = (x,y,yaw)
+    
 else:
-    print 'syntax: python dstar.py x y yaw'
+    print 'syntax: python dstar.py init_x init_y init_yaw goal_x goal_y goal_yaw'
     sys.exit(1)
 
 rospy.init_node("dstar")
@@ -79,6 +88,30 @@ def generate_path_msg(path):
         pathmsg.poses.append(ps)
 
     return pathmsg
+
+def path_to_list(path):
+    tL = []
+    xL = []
+    yL = []
+    yawL = []
+    for ps in path.poses:
+        tL.append(ps.header.stamp.to_sec())
+        xL.append(ps.pose.position.x)
+        yL.append(ps.pose.position.y)
+
+        q = ( ps.pose.orientation.x, ps.pose.orientation.y, 
+            ps.pose.orientation.z, ps.pose.orientation.w )
+        rpy = euler_from_quaternion(q)
+        yaw = rpy[2] % (2*np.pi)
+        
+        if len(yawL)>0:
+            while (yaw - yawL[-1]) >= np.pi:
+                yaw -= 2*np.pi
+            while yaw - yawL[-1] < -np.pi:
+                yaw += 2*np.pi
+        yawL.append(yaw)
+        
+    return tL,xL,yL,yawL
 
 def pos_to_s(pos):
     return pos[0]+pos[1]*map_width
@@ -164,7 +197,7 @@ def computeShortestPath():
     global OPEN_KEY, OPEN, start_s, rhs, g
     
     cnt = 0
-    while min(OPEN_KEY)<key(start_s) or rhs[start_s]!=g[start_s]:        
+    while min(OPEN_KEY)<key(start_s) or rhs[start_s]!=g[start_s]: 
         min_k = min(OPEN_KEY)
         idx = OPEN_KEY.index(min_k)
         s = OPEN[idx]
@@ -190,9 +223,9 @@ def computePathFromG():
     path = []
 
     print 'g[goal_s]=',g[goal_s],', rhs[goal]=',rhs[goal_s]
-    g[goal_s] = 0
+    # g[goal_s] = 0
     s = start_s
-    while g[s]>0:
+    while not rospy.is_shutdown() and g[s]>0:
         [min_g,min_s] = min([[g[si],si] for si in succ_s(s)])
         if min_g>0 and min_g >= g[s]:
             print "unable to find path to goal" 
@@ -207,39 +240,47 @@ def computePathFromG():
                 break
     return path
 
+
 #---------------------------------------------------------------
 # MAIN
+r = rospy.Rate(10)
 
 while current_pose==None:
+    if rospy.is_shutdown():
+        sys.exit(1)
     print 'waiting for init pose'
+    r.sleep()
 print 'init pose received'
 
-visited = np.zeros(map_width*map_height)
-g = np.ones(map_width*map_height)*float('inf') #cost to goal
-rhs = np.ones(map_width*map_height)*float('inf') 
+# visited = np.zeros(map_width*map_height)
+# g = np.ones(map_width*map_height)*float('inf') #cost to goal
+# rhs = np.ones(map_width*map_height)*float('inf') 
 
-# start_pos = (20,20)
-start_pos = (current_pose.pose.position.x/0.1,current_pose.pose.position.y/0.1)
-goal_pos  = (goal[0]/0.1, goal[1]/0.1)
-start_s = pos_to_s(start_pos)
-goal_s = pos_to_s(goal_pos)
+# # start_pos = (20,20)
+# start_pos = (current_pose.pose.position.x/0.1,current_pose.pose.position.y/0.1)
+# goal_pos  = (goal[0]/0.1, goal[1]/0.1)
+# start_s = pos_to_s(start_pos)
+# goal_s = pos_to_s(goal_pos)
 
-g[start_s]= float('inf')
-rhs[start_s]=float('inf')
-g[goal_s]=float('inf')
-rhs[goal_s]=0
+# g[start_s]= float('inf')
+# rhs[start_s]=float('inf')
+# g[goal_s]=float('inf')
+# rhs[goal_s]=0
 
-OPEN = [goal_s]
-OPEN_KEY = [key(goal_s)]
+# OPEN = [goal_s]
+# OPEN_KEY = [key(goal_s)]
 
-map_data = combine_with_static(obs_map)
+# map_data = combine_with_static(obs_map)
 
-computeShortestPath()
-path = computePathFromG()
-print 'Path:',path
-msg = generate_path_msg(path)
-pathPub.publish(msg)
+# computeShortestPath()
+# path = computePathFromG()
+# print 'Path:',path
+# msg = generate_path_msg(path)
+# pathPub.publish(msg)
 
+
+start_pos = (INIT[0]/0.1, INIT[1]/0.1)
+goal_pos  = (GOAL[0]/0.1, GOAL[1]/0.1)
 
 r = rospy.Rate(10)
 while not rospy.is_shutdown():
@@ -247,7 +288,7 @@ while not rospy.is_shutdown():
     g = np.ones(map_width*map_height)*float('inf') #cost to goal
     rhs = np.ones(map_width*map_height)*float('inf') 
 
-    start_pos = (current_pose.pose.position.x/0.1,current_pose.pose.position.y/0.1)
+    
     start_s = pos_to_s(start_pos)
     goal_s = pos_to_s(goal_pos)
 

@@ -14,30 +14,25 @@ catkin_make
 
 3. To Start Simulator & Rviz
 cd <repo>
-roslaunch robot_and_map.launch
+roslaunch simulator_with_path_follower.launch
 
-4. To set goal pose for the robot, open another terminal
-rosrun path_planner set_goal.py 10 20 3.14
-where x=10(m), y=20(m), yaw=3.14(rad)
+4. To run dijkstra algorithm
+rosrun path_planner path_planner_node {goal_x} {goal_y} {goal_yaw}
 
-5. Footprint of the robot in meters
+5. To run D* lite algorithm
+roscd path_planner
+python dstar.py {init_x} {init_y} {init_yaw} {goal_x} {goal_y} {goal_yaw}
+
+6. Footprint of the robot in meters
 
 footprint: [ [0.3302, -0.0508], [0.254, -0.0508], [0.254, -0.254], [-0.254, -0.254], [-0.254, 0.254], [0.254, 0.254], [0.254, 0.0508], [0.3302, 0.0508] ]
 
 Which can be simplified to: footprint = [ [0.3302, -0.254], [0.3302,  0.254], [-0.254, -0.254], [-0.254,  0.254] ]
 
-6. Important topics:
-/current_pose (datatype: PoseStamped) this is the GPS location of the robot
-/map (datatype: OccupancyGrid) this is the static map
 
-7. Initial Pose of the Robot: x=2, y=2, yaw=45degree
-
-8. Some debuging tip if path_planner have segfault
-
-install valgrind! (should be available on apt-get) Then create launch file to launch the node with launch-prefix="valgrind" (example in <repo>/valgrind_path_planner.launch)
-
+7. Use valgrind to debug segfault
 catkin_make -DCMAKE_BUILD_TYPE=Debug --pkg path_planner
 roslaunch valgrind_path_planner.launch
 
-9. Install ipython notebook/jupyter to view ipynb file which contains  rrt and D*lite algorithm in src/path_planner
+8. Install ipython notebook/jupyter to view ipynb file which contains  rrt and D*lite algorithm in src/path_planner
 
