@@ -39,3 +39,5 @@ install valgrind! (should be available on apt-get) Then create launch file to la
 catkin_make -DCMAKE_BUILD_TYPE=Debug --pkg path_planner
 roslaunch valgrind_path_planner.launch
 
+9. Install ipython notebook/jupyter to view ipynb file which contains  rrt and D*lite algorithm in src/path_planner
+
