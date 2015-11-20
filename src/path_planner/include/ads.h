@@ -379,9 +379,10 @@ void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh) {
     cout << "Path len: " << path.size() << endl;
     path_pub.publish(pose2d_to_path(path));
 
-
     bool change1 = 0;
+    int cnt = 0;
 
+    ros::Rate loop_rate(5);
     while (ros::ok() && tposn != iposn) {
         set<pii> changed_locs;
 
@@ -400,7 +401,10 @@ void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh) {
         ps.pose.orientation = tf::createQuaternionMsgFromYaw(initial_position.theta);
         current_pose_pub.publish(ps);
 
-
+        cout << "iteration " << cnt++ 
+            << ", pose: " << initial_position.x 
+            << ", " << initial_position.y 
+            << ", " << initial_position.theta << endl;
 
         if (change1 || change2 || epsilon > 1) {
             if ((!change1) && change2)
@@ -447,6 +451,11 @@ void AdsPlanner::start_planning_node(boost::shared_ptr<ros::NodeHandle> nh) {
             change2 = this->is_obstacle_present;
             path = computeOrImprovePath();
         }
+
+        path_pub.publish(pose2d_to_path(path));
+        ros::spinOnce();
+        loop_rate.sleep();
+
     }
 }
 #endif

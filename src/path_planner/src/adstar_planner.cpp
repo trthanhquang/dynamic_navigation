@@ -37,11 +37,11 @@ int main(int argc, char **argv){
         goal_theta = std::strtod(argv[6],NULL);
         
         initPose.x = init_x;
-        initPose.y = init_x;
+        initPose.y = init_y;
         initPose.theta = init_theta;
 
         goalPose.x = goal_x;
-        goalPose.y = goal_x;
+        goalPose.y = goal_y;
         goalPose.theta = goal_theta;
     }else{
         std::cout << "arg[6]: init_x init_y init_theta goal_x goal_y goal_theta" << std::endl;
@@ -64,8 +64,7 @@ int main(int argc, char **argv){
         ROS_ERROR("Failed to get map! Terminate program!");
         return 1;
     }
-
-    ros::Rate loop_rate(10);
+    
     AdsPlanner planner;
     planner.setStaticMap(global_static_map);
     planner.setCurrentPose(initPose);
